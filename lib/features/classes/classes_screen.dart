@@ -74,11 +74,9 @@ class ClassesScreen extends ConsumerWidget {
             else
               ClassGrid(
                 classes: state.filtered,
-                onTap: (cls) {
-                  // Navigate to the first student in the class as a demo
-                  // TODO: show class-specific student list
-                  context.go('/classes/students/${cls.code.toLowerCase().replaceAll(' ', '_')}');
-                },
+                onTap: (cls) => context.push(
+                  '/class-detail/${Uri.encodeComponent(cls.code)}',
+                ),
               ),
 
             const SizedBox(height: 24),

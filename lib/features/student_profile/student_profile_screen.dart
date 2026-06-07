@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../data/models/observation_model.dart';
 import 'providers/student_profile_provider.dart';
@@ -53,7 +54,19 @@ class StudentProfileScreen extends ConsumerWidget {
         leading: IconButton(
           icon: const Icon(Icons.chevron_left,
               color: AppColors.textPrimary, size: 28),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            // When navigated from Dashboard roster, back=classes is passed
+            // so we land on Classes instead of stacking back to Dashboard.
+            final backTo =
+                GoRouterState.of(context).uri.queryParameters['back'];
+            if (backTo == 'classes') {
+              context.go('/classes');
+            } else if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/classes');
+            }
+          },
         ),
         title: Text(
           profile.name,

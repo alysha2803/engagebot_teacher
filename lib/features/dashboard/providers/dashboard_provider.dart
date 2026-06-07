@@ -48,12 +48,23 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
           liveEngagement: MockDataService.getLiveEngagement(),
           classes: MockDataService.getClasses(),
           selectedClassIndex: 0,
-          roster: MockDataService.getRoster(),
+          roster: MockDataService.getRosterForClass('1 USAHA'),
           aiRecommendation: MockDataService.getAIRecommendation(),
         ));
 
-  void selectClass(int index) =>
-      state = state.copyWith(selectedClassIndex: index);
+  void selectClass(int index) {
+    final classCode = state.classes[index].code;
+    state = state.copyWith(
+      selectedClassIndex: index,
+      roster: MockDataService.getRosterForClass(classCode),
+    );
+  }
+
+  void editStudent(String studentId, StudentModel updated) {
+    final roster =
+        state.roster.map((s) => s.id == studentId ? updated : s).toList();
+    state = state.copyWith(roster: roster);
+  }
 }
 
 final dashboardProvider =

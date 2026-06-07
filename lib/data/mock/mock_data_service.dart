@@ -51,18 +51,60 @@ abstract final class MockDataService {
       ];
 
   // ---------------------------------------------------------------------------
-  // Student roster
+  // Per-class rosters
   // ---------------------------------------------------------------------------
 
+  static final Map<String, List<Map<String, dynamic>>> _classRosterData = {
+    '1 USAHA': [
+      {'id': 'ahmad', 'name': 'Ahmad', 'status': 'engaged'},
+      {'id': 'aina', 'name': 'Aina', 'status': 'engaged'},
+      {'id': 'hamid', 'name': 'Hamid', 'status': 'engaged'},
+      {'id': 'maya', 'name': 'Maya', 'status': 'distracted'},
+      {'id': 'badrul', 'name': 'Badrul', 'status': 'engaged'},
+      {'id': 'hani', 'name': 'Hani', 'status': 'engaged'},
+    ],
+    '2 JUJUR': [
+      {'id': 'haziq', 'name': 'Haziq', 'status': 'engaged'},
+      {'id': 'aishah', 'name': 'Aishah', 'status': 'distracted'},
+      {'id': 'rahman', 'name': 'Rahman', 'status': 'engaged'},
+      {'id': 'suria', 'name': 'Suria', 'status': 'flagged'},
+      {'id': 'jeffri', 'name': 'Jeffri', 'status': 'engaged'},
+      {'id': 'nadia', 'name': 'Nadia', 'status': 'engaged'},
+    ],
+    '3 TEKUN': [
+      {'id': 'ali_zain', 'name': 'Ali Zain', 'status': 'engaged'},
+      {'id': 'sarah_m', 'name': 'Sarah', 'status': 'engaged'},
+      {'id': 'amir_k', 'name': 'Amir', 'status': 'distracted'},
+      {'id': 'fatimah_bt', 'name': 'Fatimah', 'status': 'engaged'},
+      {'id': 'hafiz_r', 'name': 'Hafiz', 'status': 'engaged'},
+      {'id': 'nurul_f', 'name': 'Nurul', 'status': 'engaged'},
+    ],
+    '4 GIGIH': [
+      {'id': 'farid', 'name': 'Farid', 'status': 'engaged'},
+      {'id': 'lina', 'name': 'Lina', 'status': 'engaged'},
+      {'id': 'karim', 'name': 'Karim', 'status': 'distracted'},
+      {'id': 'zara', 'name': 'Zara', 'status': 'engaged'},
+      {'id': 'dani', 'name': 'Dani', 'status': 'flagged'},
+      {'id': 'sofea', 'name': 'Sofea', 'status': 'engaged'},
+    ],
+    '5 CEKAL': [
+      {'id': 'azri', 'name': 'Azri', 'status': 'engaged'},
+      {'id': 'izzati', 'name': 'Izzati', 'status': 'engaged'},
+      {'id': 'ridzuan', 'name': 'Ridzuan', 'status': 'distracted'},
+      {'id': 'farhana', 'name': 'Farhana', 'status': 'engaged'},
+      {'id': 'lutfi', 'name': 'Lutfi', 'status': 'engaged'},
+      {'id': 'shira', 'name': 'Shira', 'status': 'engaged'},
+    ],
+  };
+
   // TODO: Replace with droid live roster API
-  static List<StudentModel> getRoster() => [
-        StudentModel.fromJson({'id': 'ahmad', 'name': 'Ahmad', 'status': 'engaged'}),
-        StudentModel.fromJson({'id': 'aina', 'name': 'Aina', 'status': 'engaged'}),
-        StudentModel.fromJson({'id': 'hamid', 'name': 'Hamid', 'status': 'engaged'}),
-        StudentModel.fromJson({'id': 'maya', 'name': 'Maya', 'status': 'distracted'}),
-        StudentModel.fromJson({'id': 'badrul', 'name': 'Badrul', 'status': 'engaged'}),
-        StudentModel.fromJson({'id': 'hani', 'name': 'Hani', 'status': 'engaged'}),
-      ];
+  static List<StudentModel> getRoster() =>
+      getRosterForClass('1 USAHA');
+
+  static List<StudentModel> getRosterForClass(String classCode) {
+    final data = _classRosterData[classCode] ?? _classRosterData['1 USAHA']!;
+    return data.map((d) => StudentModel.fromJson(d)).toList();
+  }
 
   // ---------------------------------------------------------------------------
   // Student profile
@@ -70,19 +112,34 @@ abstract final class MockDataService {
 
   // TODO: Replace with droid student engagement API
   static StudentProfile getStudentProfile(String studentId) {
-    // In production this would look up by studentId; for now returns Ali Zain's data.
+    for (final entry in _classRosterData.entries) {
+      final match = entry.value.where((s) => s['id'] == studentId).toList();
+      if (match.isNotEmpty) {
+        final name = match.first['name'] as String;
+        final classCode = entry.key;
+        final subject = (classCode == '4 GIGIH' || classCode == '5 CEKAL')
+            ? 'Add Maths'
+            : 'Mathematics';
+        return _buildStudentProfile(studentId, name, classCode, subject);
+      }
+    }
+    return _buildStudentProfile(studentId, 'Unknown', '1 USAHA', 'Mathematics');
+  }
+
+  static StudentProfile _buildStudentProfile(
+      String id, String name, String className, String subject) {
     return StudentProfile.fromJson({
-      'id': studentId,
-      'name': 'Ali Zain',
-      'class': '3 TEKUN',
-      'subject': 'Mathematics',
+      'id': id,
+      'name': name,
+      'class': className,
+      'subject': subject,
       'engagementLabel': 'High Engaged',
       'avgEngagement': 88,
       'flags': 2,
       'focusDepth': 92,
       'collaboration': 45,
       'droidInsight':
-          "Ali's engagement dropped by 30% during independent reading. Try initiating a 1-on-1 concept check to re-focus.",
+          "$name's engagement dropped by 30% during independent reading. Try initiating a 1-on-1 concept check to re-focus.",
       'timeline': [
         {'time': '09:00', 'value': 70.0},
         {'time': '09:15', 'value': 80.0},
@@ -92,6 +149,22 @@ abstract final class MockDataService {
         {'time': '10:15', 'value': 78.0},
       ],
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Class-specific engagement (for Class Analytics screen)
+  // ---------------------------------------------------------------------------
+
+  // TODO: Replace with per-class droid API call
+  static Map<String, dynamic> getClassEngagement(String classCode) {
+    const data = {
+      '1 USAHA': {'percentage': 82, 'trend': '+4%', 'sessionMinutes': 42},
+      '2 JUJUR': {'percentage': 75, 'trend': '+2%', 'sessionMinutes': 38},
+      '3 TEKUN': {'percentage': 90, 'trend': '+12%', 'sessionMinutes': 51},
+      '4 GIGIH': {'percentage': 68, 'trend': '-3%', 'sessionMinutes': 30},
+      '5 CEKAL': {'percentage': 85, 'trend': '+6%', 'sessionMinutes': 45},
+    };
+    return data[classCode] ?? {'percentage': 80, 'trend': '+0%', 'sessionMinutes': 40};
   }
 
   // ---------------------------------------------------------------------------

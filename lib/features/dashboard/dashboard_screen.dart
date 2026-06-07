@@ -16,6 +16,7 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(dashboardProvider);
+    final notifier = ref.read(dashboardProvider.notifier);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -79,11 +80,17 @@ class DashboardScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
+            // Tapping a class chip: selects it (updates roster preview) AND
+            // navigates to the full Class Analytics page for that class.
             ClassSelectorRow(
               classes: state.classes,
               selectedIndex: state.selectedClassIndex,
-              onSelect: (i) =>
-                  ref.read(dashboardProvider.notifier).selectClass(i),
+              onSelect: (i) {
+                notifier.selectClass(i);
+                context.push(
+                  '/class-detail/${Uri.encodeComponent(state.classes[i].code)}',
+                );
+              },
             ),
 
             const SizedBox(height: 20),
@@ -104,9 +111,15 @@ class DashboardScreen extends ConsumerWidget {
               onlineCount: state.roster
                   .where((s) => s.status == 'engaged')
                   .length,
-              onStudentTap: (student) =>
-                  context.go('/classes/students/${student.id}'),
-              onManageTap: () => context.go('/classes'),
+              // From the dashboard, tapping a student should land on the
+              // student profile and back should go to Classes, not Dashboard.
+              // We achieve this by replacing the stack with context.go and
+              // passing back=classes as a query parameter.
+              onStudentTap: (student) => context.go(
+                '/students/${student.id}?back=classes',
+              ),
+              onStudentEdited: (updated) =>
+                  notifier.editStudent(updated.id, updated),
             ),
 
             const SizedBox(height: 20),

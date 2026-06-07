@@ -19,6 +19,19 @@ class StudentModel {
         avatarUrl: json['avatarUrl'] as String?,
       );
 
+  StudentModel copyWith({
+    String? id,
+    String? name,
+    String? status,
+    String? avatarUrl,
+  }) =>
+      StudentModel(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        status: status ?? this.status,
+        avatarUrl: avatarUrl ?? this.avatarUrl,
+      );
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
