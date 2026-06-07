@@ -106,6 +106,15 @@ abstract final class MockDataService {
     return data.map((d) => StudentModel.fromJson(d)).toList();
   }
 
+  /// Returns every class alongside its base roster — used by the Students tab.
+  static List<MapEntry<String, List<StudentModel>>> getAllClassRosters() =>
+      _classRosterData.entries
+          .map((e) => MapEntry(
+                e.key,
+                e.value.map((d) => StudentModel.fromJson(d)).toList(),
+              ))
+          .toList();
+
   // ---------------------------------------------------------------------------
   // Student profile
   // ---------------------------------------------------------------------------
@@ -197,9 +206,15 @@ abstract final class MockDataService {
         ExportHistoryModel.fromJson(
             {'type': 'PDF', 'name': 'AddMaths_4GIGIH_Weekly_', 'date': 'Oct 19, 2023', 'size': '2.4 MB'}),
         ExportHistoryModel.fromJson(
-            {'type': 'CSV', 'name': 'Engagement_Raw_Data_O', 'date': 'Oct 12, 2023', 'size': '452 KB'}),
+            {'type': 'CSV', 'name': 'Engagement_Raw_Data_Oct', 'date': 'Oct 12, 2023', 'size': '452 KB'}),
         ExportHistoryModel.fromJson(
-            {'type': 'PDF', 'name': 'Monthly_Teaching_Insights_', 'date': 'Sep 30, 2023', 'size': '5.1 MB'}),
+            {'type': 'PDF', 'name': 'Monthly_Teaching_Insights', 'date': 'Sep 30, 2023', 'size': '5.1 MB'}),
+        ExportHistoryModel.fromJson(
+            {'type': 'CSV', 'name': 'USAHA_Behavior_Log_Oct', 'date': 'Oct 5, 2023', 'size': '210 KB'}),
+        ExportHistoryModel.fromJson(
+            {'type': 'PDF', 'name': 'JUJUR_Monthly_Report', 'date': 'Sep 15, 2023', 'size': '3.2 MB'}),
+        ExportHistoryModel.fromJson(
+            {'type': 'PDF', 'name': 'TEKUN_Weekly_Summary', 'date': 'Sep 8, 2023', 'size': '1.9 MB'}),
       ];
 
   // ---------------------------------------------------------------------------

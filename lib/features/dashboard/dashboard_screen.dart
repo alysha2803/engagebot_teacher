@@ -111,13 +111,8 @@ class DashboardScreen extends ConsumerWidget {
               onlineCount: state.roster
                   .where((s) => s.status == 'engaged')
                   .length,
-              // From the dashboard, tapping a student should land on the
-              // student profile and back should go to Classes, not Dashboard.
-              // We achieve this by replacing the stack with context.go and
-              // passing back=classes as a query parameter.
-              onStudentTap: (student) => context.go(
-                '/students/${student.id}?back=classes',
-              ),
+              onStudentTap: (student) =>
+                  context.push('/students/${student.id}'),
               onStudentEdited: (updated) =>
                   notifier.editStudent(updated.id, updated),
             ),

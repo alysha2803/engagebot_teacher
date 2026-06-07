@@ -55,16 +55,10 @@ class StudentProfileScreen extends ConsumerWidget {
           icon: const Icon(Icons.chevron_left,
               color: AppColors.textPrimary, size: 28),
           onPressed: () {
-            // When navigated from Dashboard roster, back=classes is passed
-            // so we land on Classes instead of stacking back to Dashboard.
-            final backTo =
-                GoRouterState.of(context).uri.queryParameters['back'];
-            if (backTo == 'classes') {
-              context.go('/classes');
-            } else if (context.canPop()) {
+            if (context.canPop()) {
               context.pop();
             } else {
-              context.go('/classes');
+              context.go('/dashboard');
             }
           },
         ),

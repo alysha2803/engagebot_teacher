@@ -2,14 +2,21 @@ import 'package:flutter/material.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../data/models/class_model.dart';
 import '../../../shared/widgets/shared_widgets.dart';
+import '../providers/classes_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Search bar
 // ─────────────────────────────────────────────────────────────────────────────
+
 class ClassSearchBar extends StatelessWidget {
   final ValueChanged<String> onChanged;
+  final VoidCallback onFilter;
 
-  const ClassSearchBar({super.key, required this.onChanged});
+  const ClassSearchBar({
+    super.key,
+    required this.onChanged,
+    required this.onFilter,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -30,8 +37,10 @@ class ClassSearchBar extends StatelessWidget {
           hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
           prefixIcon:
               const Icon(Icons.search, color: AppColors.textMuted, size: 20),
-          suffixIcon:
-              const Icon(Icons.tune, color: AppColors.textMuted, size: 20),
+          suffixIcon: GestureDetector(
+            onTap: onFilter,
+            child: const Icon(Icons.tune, color: AppColors.primaryGreen, size: 20),
+          ),
           filled: true,
           fillColor: AppColors.cardWhite,
           border: OutlineInputBorder(
@@ -47,8 +56,9 @@ class ClassSearchBar extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Period / Roster segmented toggle
+// Periods / Students segmented toggle (renamed from Roster)
 // ─────────────────────────────────────────────────────────────────────────────
+
 class PeriodRosterToggle extends StatelessWidget {
   final bool isPeriods; // true = Periods selected
   final ValueChanged<bool> onToggle;
@@ -75,7 +85,7 @@ class PeriodRosterToggle extends StatelessWidget {
             onTap: () => onToggle(true),
           ),
           _Tab(
-            label: 'Roster',
+            label: 'Students',
             isSelected: !isPeriods,
             onTap: () => onToggle(false),
           ),
@@ -129,8 +139,9 @@ class _Tab extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2-column class grid
+// 2-column class grid (Periods tab)
 // ─────────────────────────────────────────────────────────────────────────────
+
 class ClassGrid extends StatelessWidget {
   final List<ClassModel> classes;
   final void Function(ClassModel cls) onTap;
@@ -170,6 +181,7 @@ class ClassGrid extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // Individual class card
 // ─────────────────────────────────────────────────────────────────────────────
+
 class ClassCard extends StatelessWidget {
   final ClassModel cls;
   final VoidCallback onTap;
@@ -192,7 +204,6 @@ class ClassCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Online/Offline badge top-right
             Align(
               alignment: Alignment.topRight,
               child: SageChip(
@@ -206,8 +217,6 @@ class ClassCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-
-            // Clock icon
             Container(
               width: 36,
               height: 36,
@@ -222,8 +231,6 @@ class ClassCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-
-            // Class code
             Text(
               cls.code,
               style: const TextStyle(
@@ -233,8 +240,6 @@ class ClassCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 2),
-
-            // Subject name
             Text(
               cls.subject,
               style: const TextStyle(
@@ -246,8 +251,6 @@ class ClassCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             const Spacer(),
-
-            // Student count
             Row(
               children: [
                 const Icon(
@@ -265,6 +268,236 @@ class ClassCard extends StatelessWidget {
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Student Attention List (Students tab)
+// Ranks students by engagement need: flagged → distracted → engaged
+// ─────────────────────────────────────────────────────────────────────────────
+
+class StudentAttentionList extends StatelessWidget {
+  final List<StudentWithClass> students;
+  final void Function(StudentWithClass sw) onTap;
+
+  const StudentAttentionList({
+    super.key,
+    required this.students,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (students.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Text(
+            'No students found',
+            style: TextStyle(color: AppColors.textMuted),
+          ),
+        ),
+      );
+    }
+
+    final needsAttention =
+        students.where((s) => s.student.status != 'engaged').toList();
+    final engaged =
+        students.where((s) => s.student.status == 'engaged').toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Needs Attention section ──────────────────────────────────────
+        if (needsAttention.isNotEmpty) ...[
+          _SectionHeader(
+            icon: Icons.flag_rounded,
+            label: 'Needs Attention',
+            count: needsAttention.length,
+            iconColor: AppColors.liveRed,
+          ),
+          const SizedBox(height: 8),
+          ...needsAttention.map(
+            (sw) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _StudentRow(sw: sw, onTap: () => onTap(sw)),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // ── Engaged section ──────────────────────────────────────────────
+        if (engaged.isNotEmpty) ...[
+          _SectionHeader(
+            icon: Icons.check_circle_outline,
+            label: 'Engaged',
+            count: engaged.length,
+            iconColor: AppColors.successGreen,
+          ),
+          const SizedBox(height: 8),
+          ...engaged.map(
+            (sw) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _StudentRow(sw: sw, onTap: () => onTap(sw)),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int count;
+  final Color iconColor;
+
+  const _SectionHeader({
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: iconColor),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+          decoration: BoxDecoration(
+            color: AppColors.sageLighter,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '$count',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primaryGreen,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StudentRow extends StatelessWidget {
+  final StudentWithClass sw;
+  final VoidCallback onTap;
+
+  const _StudentRow({required this.sw, required this.onTap});
+
+  Color get _statusColor {
+    switch (sw.student.status) {
+      case 'flagged':
+        return AppColors.liveRed;
+      case 'distracted':
+        return AppColors.warningAmber;
+      default:
+        return AppColors.successGreen;
+    }
+  }
+
+  String get _statusLabel {
+    final s = sw.student.status;
+    return s[0].toUpperCase() + s.substring(1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.cardWhite,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: AppColors.cardShadow,
+          border: Border(
+            left: BorderSide(color: _statusColor, width: 4),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            // Avatar
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: AppColors.sageLight,
+              child: Text(
+                sw.student.name.isNotEmpty ? sw.student.name[0] : '?',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primaryGreen,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Name + class
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    sw.student.name,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    sw.classCode,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Status chip
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _statusColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                _statusLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: _statusColor,
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right,
+                size: 18, color: AppColors.textMuted),
           ],
         ),
       ),

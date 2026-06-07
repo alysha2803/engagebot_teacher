@@ -4,12 +4,14 @@ class StudentModel {
   final String name;
   final String status; // 'engaged' | 'distracted' | 'flagged'
   final String? avatarUrl;
+  final String? statusNote; // optional teacher note attached to a status change
 
   const StudentModel({
     required this.id,
     required this.name,
     required this.status,
     this.avatarUrl,
+    this.statusNote,
   });
 
   factory StudentModel.fromJson(Map<String, dynamic> json) => StudentModel(
@@ -17,6 +19,7 @@ class StudentModel {
         name: json['name'] as String,
         status: json['status'] as String,
         avatarUrl: json['avatarUrl'] as String?,
+        statusNote: json['statusNote'] as String?,
       );
 
   StudentModel copyWith({
@@ -24,12 +27,14 @@ class StudentModel {
     String? name,
     String? status,
     String? avatarUrl,
+    String? statusNote,
   }) =>
       StudentModel(
         id: id ?? this.id,
         name: name ?? this.name,
         status: status ?? this.status,
         avatarUrl: avatarUrl ?? this.avatarUrl,
+        statusNote: statusNote ?? this.statusNote,
       );
 
   Map<String, dynamic> toJson() => {
@@ -37,6 +42,7 @@ class StudentModel {
         'name': name,
         'status': status,
         'avatarUrl': avatarUrl,
+        'statusNote': statusNote,
       };
 }
 
@@ -83,6 +89,33 @@ class StudentProfile {
     required this.droidInsight,
     required this.timeline,
   });
+
+  StudentProfile copyWith({
+    String? id,
+    String? name,
+    String? className,
+    String? subject,
+    String? engagementLabel,
+    int? avgEngagement,
+    int? flags,
+    int? focusDepth,
+    int? collaboration,
+    String? droidInsight,
+    List<EngagementPoint>? timeline,
+  }) =>
+      StudentProfile(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        className: className ?? this.className,
+        subject: subject ?? this.subject,
+        engagementLabel: engagementLabel ?? this.engagementLabel,
+        avgEngagement: avgEngagement ?? this.avgEngagement,
+        flags: flags ?? this.flags,
+        focusDepth: focusDepth ?? this.focusDepth,
+        collaboration: collaboration ?? this.collaboration,
+        droidInsight: droidInsight ?? this.droidInsight,
+        timeline: timeline ?? this.timeline,
+      );
 
   factory StudentProfile.fromJson(Map<String, dynamic> json) => StudentProfile(
         id: json['id'] as String? ?? json['name'] as String,

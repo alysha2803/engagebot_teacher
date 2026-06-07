@@ -326,6 +326,8 @@ class _StudentEditRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasNote =
+        student.statusNote != null && student.statusNote!.isNotEmpty;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
       leading: CircleAvatar(
@@ -345,12 +347,32 @@ class _StudentEditRow extends StatelessWidget {
           color: AppColors.textPrimary,
         ),
       ),
-      subtitle: Text(
-        _statusLabel(student.status),
-        style: TextStyle(
-          fontSize: 12,
-          color: _statusColor(student.status),
-        ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _statusLabel(student.status),
+            style: TextStyle(
+              fontSize: 12,
+              color: _statusColor(student.status),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (hasNote)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                'Note: ${student.statusNote}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textMuted,
+                  fontStyle: FontStyle.italic,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
       ),
       trailing: IconButton(
         icon: const Icon(Icons.edit_outlined,
@@ -393,6 +415,7 @@ class _EditStudentDialog extends StatefulWidget {
 
 class _EditStudentDialogState extends State<_EditStudentDialog> {
   late TextEditingController _nameController;
+  late TextEditingController _noteController;
   late String _selectedStatus;
 
   static const _statuses = ['engaged', 'distracted', 'flagged'];
@@ -401,12 +424,14 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.student.name);
+    _noteController = TextEditingController(text: widget.student.statusNote ?? '');
     _selectedStatus = widget.student.status;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -509,6 +534,30 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
               );
             }).toList(),
           ),
+          const SizedBox(height: 20),
+
+          // Reasoning note
+          TextField(
+            controller: _noteController,
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: 'Reason / Note (optional)',
+              hintText: 'e.g. Distracted during group activity',
+              labelStyle:
+                  const TextStyle(color: AppColors.textSecondary),
+              alignLabelWithHint: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    const BorderSide(color: AppColors.primaryGreen),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 12),
+            ),
+          ),
         ],
       ),
       actionsPadding:
@@ -525,10 +574,12 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
           onPressed: () {
             final name = _nameController.text.trim();
             if (name.isEmpty) return;
+            final note = _noteController.text.trim();
             widget.onSave(
               widget.student.copyWith(
                 name: name,
                 status: _selectedStatus,
+                statusNote: note.isEmpty ? null : note,
               ),
             );
             Navigator.of(context).pop();
