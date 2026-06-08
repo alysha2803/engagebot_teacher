@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // State
@@ -75,12 +76,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // ── Sign in ───────────────────────────────────────────────────────────────
 
+  static final _googleSignIn = GoogleSignIn();
+
   Future<void> signInWithGoogle() async {
     state = AuthState.loading();
     try {
-      final user = (await FirebaseAuth.instance
-              .signInWithProvider(GoogleAuthProvider()))
-          .user!;
+      // Use the native Google Sign-In SDK — more reliable on Android than
+      // signInWithProvider which needs browser redirect URI configuration.
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        // User cancelled the picker.
+        state = AuthState.unauthenticated();
+        return;
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+      final user = userCredential.user!;
       final email = user.email!.toLowerCase();
 
       // Check whether this Google account belongs to a registered teacher.
@@ -92,14 +110,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (snap.docs.isEmpty) {
         await FirebaseAuth.instance.signOut();
+        await _googleSignIn.signOut();
         state = AuthState.notRegistered();
         return;
       }
 
       final doc = snap.docs.first;
-      // Link the Firebase Auth UID to the teacher document.
       await doc.reference.update({'authUid': user.uid});
-      // Write/merge a user record so future sessions can resolve teacherId fast.
       await FirebaseFirestore.instance.doc('users/${user.uid}').set(
         {'teacherId': doc.id, 'role': 'teacher', 'email': email},
         SetOptions(merge: true),
@@ -107,13 +124,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       state = AuthState.authenticated(doc.id, email);
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'web-context-cancelled' ||
-          e.code == 'canceled') {
-        // User closed the sign-in popup — don't show an error.
-        state = AuthState.unauthenticated();
-      } else {
-        state = AuthState.error(e.message ?? 'Authentication failed');
-      }
+      state = AuthState.error(e.message ?? 'Authentication failed');
     } catch (_) {
       state = AuthState.error('Sign-in failed. Please try again.');
     }
@@ -173,6 +184,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   // ── Sign out ──────────────────────────────────────────────────────────────
 
   Future<void> signOut() async {
+    try {
+      await _googleSignIn.signOut(); // clears the cached Google account token
+    } catch (_) {}
     await FirebaseAuth.instance.signOut();
     state = AuthState.unauthenticated();
   }

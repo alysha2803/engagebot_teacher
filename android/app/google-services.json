@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "638539840267-pl5otjo85ukgqenouk44qvqa3fi2kfh9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.engagebot.engagebot_teacher",
+            "certificate_hash": "6964732ee28245012409af2bfbf5fb25b3682b4f"
+          }
+        },
+        {
           "client_id": "638539840267-c4f9r5pbp726542uhcuubcivia1t93uq.apps.googleusercontent.com",
           "client_type": 3
         }

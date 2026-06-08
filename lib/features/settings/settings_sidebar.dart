@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../app/router/app_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../data/mock/mock_data_service.dart';
 import '../auth/providers/auth_provider.dart';
@@ -16,10 +18,17 @@ class SettingsSidebar extends ConsumerStatefulWidget {
 
 class _SettingsSidebarState extends ConsumerState<SettingsSidebar> {
   void _showLogoutDialog() {
+    // Capture stable references BEFORE the dialog opens — dialog callbacks
+    // must not access `context` after dismiss because the sidebar may be
+    // unmounted by then.
+    final router = GoRouter.of(context);
+    final authNotifier = ref.read(authProvider.notifier);
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Log Out?',
             style: TextStyle(fontWeight: FontWeight.w700)),
         content: const Text(
@@ -29,15 +38,20 @@ class _SettingsSidebarState extends ConsumerState<SettingsSidebar> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(ctx);
-              ref.read(authProvider.notifier).signOut();
+              Navigator.of(ctx).pop(); // dismiss dialog via its own context
+              // GoRouter's _AuthStateNotifier redirects to /login when
+              // Firebase auth changes; go() is a safety-net fallback.
+              authNotifier.signOut().then((_) {
+                router.go(AppRoutes.login);
+              });
             },
-            style: TextButton.styleFrom(foregroundColor: AppColors.liveRed),
+            style:
+                TextButton.styleFrom(foregroundColor: AppColors.liveRed),
             child: const Text('Log Out'),
           ),
         ],
