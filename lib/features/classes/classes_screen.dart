@@ -38,9 +38,10 @@ class ClassesScreen extends ConsumerWidget {
         builder: (ctx, setSheetState) {
           String? current = ref.read(classesProvider).statusFilter;
           return Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            decoration: BoxDecoration(
+              color: ctx.colorCard,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(20)),
             ),
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
             child: Column(
@@ -53,7 +54,7 @@ class ClassesScreen extends ConsumerWidget {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppColors.borderLight,
+                      color: ctx.colorBorder,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -61,10 +62,10 @@ class ClassesScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
                 Text(
                   isPeriods ? 'Filter Classes' : 'Filter Students',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: ctx.colorOnCard,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -80,7 +81,7 @@ class ClassesScreen extends ConsumerWidget {
                             : FontWeight.normal,
                         color: isSelected
                             ? AppColors.primaryGreen
-                            : AppColors.textPrimary,
+                            : ctx.colorOnCard,
                       ),
                     ),
                     trailing: isSelected

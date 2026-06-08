@@ -1,3 +1,4 @@
+import '../models/analytics_models.dart';
 import '../models/class_model.dart';
 import '../models/student_model.dart';
 import '../models/observation_model.dart';
@@ -260,4 +261,261 @@ abstract final class MockDataService {
         'description':
             '3 TEKUN showing peak visual focus today (+12%).',
       };
+
+  // ---------------------------------------------------------------------------
+  // Behaviour analysis — UC-6.2
+  // ---------------------------------------------------------------------------
+
+  // TODO: Replace with droid behaviour API
+  static List<StudentBehaviourRecord> getBehaviourData(String classCode) {
+    final roster = getRosterForClass(classCode);
+    final records = roster.map((s) {
+      final seed = s.id.length;
+      final score = switch (s.status) {
+        'engaged' => 75 + (seed % 21),
+        'distracted' => 40 + (seed % 26),
+        'flagged' => 20 + (seed % 31),
+        _ => 60,
+      };
+      final offTask = switch (s.status) {
+        'engaged' => seed % 2,
+        'distracted' => 2 + (seed % 4),
+        'flagged' => 5 + (seed % 5),
+        _ => 1,
+      };
+      final attention = switch (s.status) {
+        'engaged' => 30 + (seed % 16),
+        'distracted' => 12 + (seed % 16),
+        'flagged' => 5 + (seed % 11),
+        _ => 20,
+      };
+      return StudentBehaviourRecord(
+        studentId: s.id,
+        studentName: s.name,
+        engagementScore: score,
+        attentionMinutes: attention,
+        offTaskCount: offTask,
+        dominantStatus: s.status,
+      );
+    }).toList();
+
+    // Sort: flagged → distracted → engaged
+    const order = {'flagged': 0, 'distracted': 1, 'engaged': 2};
+    records.sort((a, b) =>
+        (order[a.dominantStatus] ?? 3).compareTo(order[b.dominantStatus] ?? 3));
+    return records;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Weekly trend — UC-6.4
+  // ---------------------------------------------------------------------------
+
+  // TODO: Replace with droid historical API
+  static List<WeeklyDataPoint> getWeeklyTrend(String classCode) {
+    const trends = {
+      '1 USAHA': [70, 78, 82, 75, 88, 80, 82],
+      '2 JUJUR': [65, 70, 75, 72, 78, 75, 75],
+      '3 TEKUN': [80, 85, 88, 90, 91, 89, 90],
+      '4 GIGIH': [60, 55, 68, 70, 65, 63, 68],
+      '5 CEKAL': [75, 78, 82, 85, 84, 83, 85],
+    };
+    final values = trends[classCode] ?? [70, 72, 75, 73, 78, 76, 80];
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return List.generate(
+        7, (i) => WeeklyDataPoint(dayLabel: days[i], engagement: values[i]));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Session history — UC-6.4
+  // ---------------------------------------------------------------------------
+
+  // TODO: Replace with droid session history API
+  static List<SessionRecord> getSessionHistory(String classCode) {
+    final subject =
+        (classCode == '4 GIGIH' || classCode == '5 CEKAL') ? 'Add Maths' : 'Mathematics';
+    return [
+      SessionRecord(
+        date: 'Mon, 2 Jun 2025',
+        classCode: classCode,
+        subject: subject,
+        avgEngagement: 88,
+        durationMinutes: 50,
+        studentCount: 28,
+        flaggedCount: 1,
+        highlight: 'Strong participation during group work',
+      ),
+      SessionRecord(
+        date: 'Fri, 30 May 2025',
+        classCode: classCode,
+        subject: subject,
+        avgEngagement: 75,
+        durationMinutes: 45,
+        studentCount: 28,
+        flaggedCount: 3,
+        highlight: 'Low attention during independent work',
+      ),
+      SessionRecord(
+        date: 'Wed, 28 May 2025',
+        classCode: classCode,
+        subject: subject,
+        avgEngagement: 82,
+        durationMinutes: 50,
+        studentCount: 27,
+        flaggedCount: 2,
+        highlight: 'Good response to Q&A segment',
+      ),
+      SessionRecord(
+        date: 'Mon, 26 May 2025',
+        classCode: classCode,
+        subject: subject,
+        avgEngagement: 79,
+        durationMinutes: 48,
+        studentCount: 28,
+        flaggedCount: 2,
+        highlight: 'Slight dip mid-session, recovered well',
+      ),
+      SessionRecord(
+        date: 'Fri, 23 May 2025',
+        classCode: classCode,
+        subject: subject,
+        avgEngagement: 91,
+        durationMinutes: 52,
+        studentCount: 28,
+        flaggedCount: 0,
+        highlight: 'Best session this month — peak focus',
+      ),
+    ];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Teaching recommendations — UC-8
+  // ---------------------------------------------------------------------------
+
+  // TODO: Replace with droid AI teaching style API
+  static List<TeachingRecommendation> getTeachingRecommendations() => [
+        TeachingRecommendation(
+          id: 'tr1',
+          category: 'Engagement',
+          title: 'Introduce Micro-Breaks',
+          description:
+              '5 sessions showed dipping engagement after 20 min. A 2-min energiser break can reset focus and raise class participation by ~15%.',
+          priority: 'high',
+        ),
+        TeachingRecommendation(
+          id: 'tr2',
+          category: 'Strategy',
+          title: 'Think-Pair-Share',
+          description:
+              'Students in rows 2–3 show lower collaboration scores. Structured pair discussions during problem-solving increase visible engagement.',
+          priority: 'high',
+        ),
+        TeachingRecommendation(
+          id: 'tr3',
+          category: 'Attention',
+          title: 'Proximity Technique',
+          description:
+              'Move around the room during silent tasks. Physical proximity reduces off-task behaviour by up to 40% for distracted students.',
+          priority: 'medium',
+        ),
+        TeachingRecommendation(
+          id: 'tr4',
+          category: 'Behaviour',
+          title: 'Positive Reinforcement Cues',
+          description:
+              'Use verbal affirmations when students refocus. Flagged students respond better to private acknowledgement over whole-class correction.',
+          priority: 'medium',
+        ),
+        TeachingRecommendation(
+          id: 'tr5',
+          category: 'Strategy',
+          title: 'Exit Ticket Routine',
+          description:
+              'End sessions with a 3-question exit ticket. Helps students consolidate learning and gives you data on concept retention.',
+          priority: 'low',
+        ),
+        TeachingRecommendation(
+          id: 'tr6',
+          category: 'Engagement',
+          title: 'Varied Question Types',
+          description:
+              'Mix recall, application, and open-ended questions. Varying difficulty keeps high-performers engaged while supporting struggling students.',
+          priority: 'low',
+        ),
+      ];
+
+  // ---------------------------------------------------------------------------
+  // Student session history — UC-6.1 (View Full History)
+  // ---------------------------------------------------------------------------
+
+  // TODO: Replace with droid per-student history API
+  static List<SessionRecord> getStudentSessionHistory(String studentId) {
+    final classCode = _classRosterData.entries
+        .where((e) => e.value.any((s) => s['id'] == studentId))
+        .map((e) => e.key)
+        .firstOrNull ?? '1 USAHA';
+    final subject =
+        (classCode == '4 GIGIH' || classCode == '5 CEKAL') ? 'Add Maths' : 'Mathematics';
+    return [
+      SessionRecord(
+        date: 'Mon, 2 Jun 2025',
+        classCode: classCode,
+        subject: subject,
+        avgEngagement: 88,
+        durationMinutes: 50,
+        studentCount: 1,
+        flaggedCount: 0,
+        highlight: 'Highly focused during practice problems',
+      ),
+      SessionRecord(
+        date: 'Fri, 30 May 2025',
+        classCode: classCode,
+        subject: subject,
+        avgEngagement: 72,
+        durationMinutes: 45,
+        studentCount: 1,
+        flaggedCount: 1,
+        highlight: 'Distracted during the last 15 min',
+      ),
+      SessionRecord(
+        date: 'Wed, 28 May 2025',
+        classCode: classCode,
+        subject: subject,
+        avgEngagement: 81,
+        durationMinutes: 50,
+        studentCount: 1,
+        flaggedCount: 0,
+        highlight: 'Engaged throughout group activity',
+      ),
+      SessionRecord(
+        date: 'Mon, 26 May 2025',
+        classCode: classCode,
+        subject: subject,
+        avgEngagement: 76,
+        durationMinutes: 48,
+        studentCount: 1,
+        flaggedCount: 1,
+        highlight: 'Inconsistent focus throughout session',
+      ),
+      SessionRecord(
+        date: 'Fri, 23 May 2025',
+        classCode: classCode,
+        subject: subject,
+        avgEngagement: 91,
+        durationMinutes: 52,
+        studentCount: 1,
+        flaggedCount: 0,
+        highlight: 'Best performance this month',
+      ),
+      SessionRecord(
+        date: 'Wed, 21 May 2025',
+        classCode: classCode,
+        subject: subject,
+        avgEngagement: 68,
+        durationMinutes: 47,
+        studentCount: 1,
+        flaggedCount: 2,
+        highlight: 'Struggled with new topic introduction',
+      ),
+    ];
+  }
 }
