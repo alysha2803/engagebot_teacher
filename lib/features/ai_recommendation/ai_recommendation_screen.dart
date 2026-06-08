@@ -2,18 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/app_colors.dart';
 import '../../shared/widgets/engagebot_scaffold.dart';
+import '../dashboard/providers/dashboard_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Simple in-screen state — no separate provider needed for a placeholder.
+// Model
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _Recommendation {
   final String id;
-  final String classLabel; // 'Overall' or a class code
+  final String classLabel; // 'Overall' or an actual class code
   final String title;
   final String body;
   final String category; // 'Engagement' | 'Behaviour' | 'Attention' | 'Pacing'
-  final String impact; // 'High' | 'Medium' | 'Low'
+  final String impact;   // 'High' | 'Medium' | 'Low'
   bool saved = false;
   bool ignored = false;
 
@@ -27,68 +28,98 @@ class _Recommendation {
   });
 }
 
-final List<_Recommendation> _sampleRecs = [
-  _Recommendation(
-    id: 'r1',
-    classLabel: 'Overall',
-    title: 'Introduce more peer discussion breaks',
-    body:
-        'Engagement drops by ~18% after 20 continuous minutes of direct instruction. '
-        'Short 3-minute peer discussion intervals every 20 minutes could sustain attention through the full lesson.',
-    category: 'Engagement',
-    impact: 'High',
-  ),
-  _Recommendation(
-    id: 'r2',
-    classLabel: 'F4S1',
-    title: 'Vary question difficulty in F4S1',
-    body:
-        '6 students in this class are consistently in "distracted" status within the first 10 minutes. '
-        'Starting with a low-stakes warm-up question before scaling difficulty may re-anchor attention.',
-    category: 'Attention',
-    impact: 'High',
-  ),
-  _Recommendation(
-    id: 'r3',
-    classLabel: 'F4S2',
-    title: 'Reduce slide density for F4S2',
-    body:
-        'Slides with more than 5 bullet points correlate with a 12% drop in engagement for this class. '
-        'Consider splitting dense slides or using visual diagrams instead.',
-    category: 'Pacing',
-    impact: 'Medium',
-  ),
-  _Recommendation(
-    id: 'r4',
-    classLabel: 'F5S1',
-    title: 'Acknowledge top-engaged students in F5S1',
-    body:
-        '4 students maintain above-90% engagement consistently. Recognising their participation '
-        'could serve as a positive model for the rest of the class.',
-    category: 'Behaviour',
-    impact: 'Medium',
-  ),
-  _Recommendation(
-    id: 'r5',
-    classLabel: 'Overall',
-    title: 'Schedule complex topics in Period 2–3',
-    body:
-        'Engagement data across all classes shows a peak between 8:10 and 9:30. '
-        'Scheduling cognitively demanding topics in this window may improve retention.',
-    category: 'Pacing',
-    impact: 'High',
-  ),
-  _Recommendation(
-    id: 'r6',
-    classLabel: 'F5S2',
-    title: 'Use movement-based activities in F5S2',
-    body:
-        'F5S2 shows significantly lower engagement (avg 54%) compared to other classes. '
-        'Incorporating a short physical activity or group rotation exercise may help reset focus.',
-    category: 'Engagement',
-    impact: 'Medium',
-  ),
+// ─────────────────────────────────────────────────────────────────────────────
+// Sample recommendation builder — keyed to actual class codes
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Per-class recommendation templates. CLASS is replaced with the real code.
+const _kTemplates = [
+  {
+    'category': 'Attention',
+    'impact': 'High',
+    'title': 'Vary question difficulty in CLASS',
+    'body':
+        'Several students in CLASS are consistently in "distracted" status within '
+            'the first 10 minutes. Starting with a low-stakes warm-up question before '
+            'scaling difficulty may re-anchor attention early in the lesson.',
+  },
+  {
+    'category': 'Pacing',
+    'impact': 'Medium',
+    'title': 'Reduce slide density for CLASS',
+    'body':
+        'Slides with more than 5 bullet points correlate with a 12% drop in engagement '
+            'in CLASS. Consider splitting dense slides or replacing them with visual '
+            'diagrams to keep the class focused.',
+  },
+  {
+    'category': 'Behaviour',
+    'impact': 'Medium',
+    'title': 'Acknowledge top-engaged students in CLASS',
+    'body':
+        'Several students in CLASS maintain above-90% engagement consistently. '
+            'Recognising their participation publicly could serve as a positive model '
+            'and motivate peers who are less focused.',
+  },
+  {
+    'category': 'Engagement',
+    'impact': 'Medium',
+    'title': 'Add movement-based activities in CLASS',
+    'body':
+        'CLASS shows a lower average engagement compared to your other classes. '
+            'Incorporating a short physical activity or group rotation exercise near '
+            'the mid-point of the lesson may help reset focus.',
+  },
+  {
+    'category': 'Attention',
+    'impact': 'Low',
+    'title': 'Review seating arrangement in CLASS',
+    'body':
+        'Flagged students in CLASS tend to cluster in the same area. A simple '
+            'rearrangement that alternates high- and low-engagement students may '
+            'improve peer-influence dynamics and reduce off-task incidents.',
+  },
 ];
+
+List<_Recommendation> _buildSampleRecs(List<String> classCodes) {
+  final recs = <_Recommendation>[
+    _Recommendation(
+      id: 'r_ov1',
+      classLabel: 'Overall',
+      title: 'Introduce peer discussion breaks',
+      body: 'Engagement drops by ~18% after 20 continuous minutes of direct '
+          'instruction. Short 3-minute peer discussion intervals every 20 minutes '
+          'could sustain attention through the full lesson across all your classes.',
+      category: 'Engagement',
+      impact: 'High',
+    ),
+    _Recommendation(
+      id: 'r_ov2',
+      classLabel: 'Overall',
+      title: 'Schedule complex topics in Period 2–3',
+      body: 'Engagement data across all your classes shows a peak between 8:10 and '
+          '9:30. Scheduling cognitively demanding topics in this window may improve '
+          'retention and reduce the number of flagged students.',
+      category: 'Pacing',
+      impact: 'High',
+    ),
+  ];
+
+  for (int i = 0; i < classCodes.length; i++) {
+    final code = classCodes[i];
+    final t = _kTemplates[i % _kTemplates.length];
+    recs.add(_Recommendation(
+      id: 'r_cls_$i',
+      classLabel: code,
+      title: (t['title']!).replaceAll('CLASS', code),
+      body: (t['body']!).replaceAll('CLASS', code),
+      category: t['category']!,
+      impact: t['impact']!,
+    ));
+  }
+
+  return recs;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Screen
@@ -104,16 +135,20 @@ class AIRecommendationScreen extends ConsumerStatefulWidget {
 
 class _AIRecommendationScreenState
     extends ConsumerState<AIRecommendationScreen> {
-  late List<_Recommendation> _recs;
+  List<_Recommendation> _recs = [];
+  List<String> _lastCodes = [];
   String _selectedFilter = 'All';
   bool _isGenerating = false;
 
-  static const _filters = ['All', 'Overall', 'F4S1', 'F4S2', 'F5S1', 'F5S2'];
-
-  @override
-  void initState() {
-    super.initState();
-    _recs = List.of(_sampleRecs);
+  // Rebuild recs when the teacher's class list changes (e.g. after Firebase
+  // load or after switching accounts).
+  void _syncRecs(List<String> codes) {
+    if (codes.join('|') == _lastCodes.join('|')) return;
+    _lastCodes = codes;
+    _recs = _buildSampleRecs(codes);
+    // Reset filter if it no longer exists in the new class list.
+    final validFilters = {'All', 'Overall', ...codes};
+    if (!validFilters.contains(_selectedFilter)) _selectedFilter = 'All';
   }
 
   List<_Recommendation> get _visible {
@@ -124,17 +159,14 @@ class _AIRecommendationScreenState
 
   int get _savedCount => _recs.where((r) => r.saved).length;
   int get _ignoredCount => _recs.where((r) => r.ignored).length;
-  int get _pendingCount =>
-      _recs.where((r) => !r.saved && !r.ignored).length;
+  int get _pendingCount => _recs.where((r) => !r.saved && !r.ignored).length;
 
   void _save(String id) =>
       setState(() => _recs.firstWhere((r) => r.id == id).saved = true);
-
-  void _ignore(String id) =>
-      setState(() => _recs.firstWhere((r) => r.id == id).ignored = true);
-
   void _unsave(String id) =>
       setState(() => _recs.firstWhere((r) => r.id == id).saved = false);
+  void _ignore(String id) =>
+      setState(() => _recs.firstWhere((r) => r.id == id).ignored = true);
 
   Future<void> _generate() async {
     setState(() => _isGenerating = true);
@@ -152,13 +184,24 @@ class _AIRecommendationScreenState
         ),
         backgroundColor: AppColors.primaryGreen,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // Watch the class list from the same provider as the Dashboard so both
+    // screens always reflect the same teacher account.
+    final classes =
+        ref.watch(dashboardProvider.select((s) => s.classes));
+    final codes = classes.map((c) => c.code).toList();
+
+    // Mutate _recs inline (safe: only runs when codes actually change).
+    _syncRecs(codes);
+
+    final filters = ['All', 'Overall', ...codes];
     final visible = _visible;
     final th = Theme.of(context);
 
@@ -166,8 +209,7 @@ class _AIRecommendationScreenState
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu_rounded),
-          onPressed: () =>
-              EngagebotDrawer.maybeOf(context)?.openDrawer(),
+          onPressed: () => EngagebotDrawer.maybeOf(context)?.openDrawer(),
         ),
         title: const Text(
           'AI Insights',
@@ -194,21 +236,21 @@ class _AIRecommendationScreenState
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Summary stats ───────────────────────────────────────────────
+          // ── Summary stat chips ──────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Row(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
               children: [
                 _StatChip(
                     label: 'Pending',
                     value: _pendingCount,
                     color: AppColors.warningAmber),
-                const SizedBox(width: 8),
                 _StatChip(
                     label: 'Saved',
                     value: _savedCount,
                     color: AppColors.primaryGreen),
-                const SizedBox(width: 8),
                 _StatChip(
                     label: 'Ignored',
                     value: _ignoredCount,
@@ -219,16 +261,16 @@ class _AIRecommendationScreenState
 
           const SizedBox(height: 14),
 
-          // ── Class filter chips ──────────────────────────────────────────
+          // ── Class filter chips — built from dashboardProvider.classes ───
           SizedBox(
             height: 36,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _filters.length,
+              itemCount: filters.length,
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (_, i) {
-                final f = _filters[i];
+                final f = filters[i];
                 final selected = _selectedFilter == f;
                 return GestureDetector(
                   onTap: () => setState(() => _selectedFilter = f),
@@ -252,8 +294,9 @@ class _AIRecommendationScreenState
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color:
-                            selected ? Colors.white : th.colorScheme.onSurface,
+                        color: selected
+                            ? Colors.white
+                            : th.colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -344,10 +387,9 @@ class _RecommendationCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Row: category chip + class badge + impact dot
+            // Header row: category pill + class badge + impact indicator
             Row(
               children: [
-                // Category pill
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -365,7 +407,6 @@ class _RecommendationCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Class badge
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -387,7 +428,6 @@ class _RecommendationCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                // Impact indicator
                 Container(
                   width: 8,
                   height: 8,
@@ -409,7 +449,6 @@ class _RecommendationCard extends StatelessWidget {
 
             const SizedBox(height: 10),
 
-            // Title
             Text(
               rec.title,
               style: TextStyle(
@@ -421,7 +460,6 @@ class _RecommendationCard extends StatelessWidget {
 
             const SizedBox(height: 6),
 
-            // Body
             Text(
               rec.body,
               style: TextStyle(
@@ -433,7 +471,6 @@ class _RecommendationCard extends StatelessWidget {
 
             const SizedBox(height: 14),
 
-            // Action buttons
             Row(
               children: [
                 Expanded(
@@ -460,9 +497,8 @@ class _RecommendationCard extends StatelessWidget {
                       backgroundColor: rec.saved
                           ? AppColors.primaryGreen.withValues(alpha: 0.15)
                           : AppColors.primaryGreen,
-                      foregroundColor: rec.saved
-                          ? AppColors.primaryGreen
-                          : Colors.white,
+                      foregroundColor:
+                          rec.saved ? AppColors.primaryGreen : Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),

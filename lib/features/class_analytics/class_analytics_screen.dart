@@ -1,32 +1,39 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../data/mock/mock_data_service.dart';
 import '../../data/models/analytics_models.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
+import '../../data/services/firebase_data_service.dart';
 import '../../shared/widgets/shared_widgets.dart';
+import '../auth/providers/auth_provider.dart';
+import '../dashboard/providers/dashboard_provider.dart';
 import '../dashboard/widgets/ai_recommendation_card.dart';
 
 /// Class Analytics screen — pushed from Dashboard or Classes.
 /// Tabs: Overview (UC-6.3) | Behaviour (UC-6.2) | History (UC-6.4)
-class ClassAnalyticsScreen extends StatefulWidget {
+class ClassAnalyticsScreen extends ConsumerStatefulWidget {
   final String classCode;
 
   const ClassAnalyticsScreen({super.key, required this.classCode});
 
   @override
-  State<ClassAnalyticsScreen> createState() => _ClassAnalyticsScreenState();
+  ConsumerState<ClassAnalyticsScreen> createState() =>
+      _ClassAnalyticsScreenState();
 }
 
-class _ClassAnalyticsScreenState extends State<ClassAnalyticsScreen>
+class _ClassAnalyticsScreenState extends ConsumerState<ClassAnalyticsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
-  late final ClassModel _cls;
-  late final List<StudentModel> _roster;
-  late final Map<String, dynamic> _engagement;
-  late final List<StudentBehaviourRecord> _behaviourData;
+  late ClassModel _cls;
+  // Base roster from Firebase/mock — edits overlay is applied in build().
+  List<StudentModel> _baseRoster = [];
+  late Map<String, dynamic> _engagement;
+  // Base behaviour data — edit names/status applied in build().
+  List<StudentBehaviourRecord> _baseBehaviourData = [];
   late final List<WeeklyDataPoint> _weeklyTrend;
   late final List<SessionRecord> _sessionHistory;
 
@@ -34,16 +41,37 @@ class _ClassAnalyticsScreenState extends State<ClassAnalyticsScreen>
   void initState() {
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
-    final classes = MockDataService.getClasses();
-    _cls = classes.firstWhere(
+
+    // Prefer Firebase-aware class list from dashboardProvider; fall back to
+    // teacher-scoped mock so Rahman's classes are found correctly.
+    final teacherId = ref.read(currentTeacherIdProvider) ?? '';
+    final fbClasses = ref.read(dashboardProvider).classes;
+    final allClasses = fbClasses.isNotEmpty
+        ? fbClasses
+        : MockDataService.getClassesForTeacher(teacherId);
+    _cls = allClasses.firstWhere(
       (c) => c.code == widget.classCode,
-      orElse: () => classes.first,
+      orElse: () => allClasses.isNotEmpty ? allClasses.first
+          : MockDataService.getClasses().first,
     );
-    _roster = MockDataService.getRosterForClass(_cls.code);
+
+    _baseRoster = MockDataService.getRosterForClass(_cls.code);
     _engagement = MockDataService.getClassEngagement(_cls.code);
-    _behaviourData = MockDataService.getBehaviourData(_cls.code);
+    _baseBehaviourData = MockDataService.getBehaviourData(_cls.code);
     _weeklyTrend = MockDataService.getWeeklyTrend(_cls.code);
     _sessionHistory = MockDataService.getSessionHistory(_cls.code);
+
+    // Replace mock roster with live Firebase data.
+    _loadRosterFromFirebase();
+  }
+
+  Future<void> _loadRosterFromFirebase() async {
+    final teacherId = ref.read(currentTeacherIdProvider) ?? '';
+    if (teacherId.isEmpty || !mounted) return;
+    final fbRoster = await FirebaseDataService.getRosterForClass(
+        widget.classCode, teacherId);
+    if (!mounted) return;
+    setState(() => _baseRoster = fbRoster);
   }
 
   @override
@@ -54,6 +82,22 @@ class _ClassAnalyticsScreenState extends State<ClassAnalyticsScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Reactively apply in-session edits (name/status/note changes from Manage).
+    final edits = ref.watch(studentEditsProvider);
+    final roster = _baseRoster.map((s) => edits[s.id] ?? s).toList();
+    final behaviourData = _baseBehaviourData.map((r) {
+      final edit = edits[r.studentId];
+      if (edit == null) return r;
+      return StudentBehaviourRecord(
+        studentId: r.studentId,
+        studentName: edit.name,
+        engagementScore: r.engagementScore,
+        attentionMinutes: r.attentionMinutes,
+        offTaskCount: r.offTaskCount,
+        dominantStatus: edit.status,
+      );
+    }).toList();
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -109,11 +153,11 @@ class _ClassAnalyticsScreenState extends State<ClassAnalyticsScreen>
         children: [
           _OverviewTab(
             cls: _cls,
-            roster: _roster,
+            roster: roster,
             engagement: _engagement,
             aiRec: MockDataService.getAIRecommendation(),
           ),
-          _BehaviourTab(behaviourData: _behaviourData),
+          _BehaviourTab(behaviourData: behaviourData),
           _HistoryTab(
             weeklyTrend: _weeklyTrend,
             sessionHistory: _sessionHistory,

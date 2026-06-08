@@ -123,6 +123,8 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
   }
 
   void editStudent(String studentId, StudentModel updated) {
+    // Persist to Firestore (fire-and-forget — UI updates via in-memory overlay).
+    FirebaseDataService.updateStudent(studentId, updated);
     // Persist to global store so other screens and future selectClass calls
     // pick up the change without hitting MockDataService again.
     _ref.read(studentEditsProvider.notifier).update(

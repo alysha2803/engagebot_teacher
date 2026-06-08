@@ -85,7 +85,53 @@ abstract final class FirebaseDataService {
             });
           }).toList();
         },
-        MockDataService.getClasses,
+        () => MockDataService.getClassesForTeacher(teacherId),
+      );
+
+  // ── Write — update a student document ────────────────────────────────────
+
+  // Persists name/status/statusNote edits to Firestore.
+  // Fire-and-forget: callers update the in-memory overlay immediately so the
+  // UI never waits on this write.
+  static Future<void> updateStudent(
+      String studentId, StudentModel student) async {
+    try {
+      await _db.collection(_kStudents).doc(studentId).update({
+        'name': student.name,
+        'status': student.status,
+        'statusNote': student.statusNote ?? '',
+      }).timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // Silently ignore — studentEditsProvider holds the in-session edit.
+    }
+  }
+
+  // ── All students for a teacher (one query) ────────────────────────────────
+
+  // Returns every student for the given teacher, each with `classCode` set.
+  // Used by ClassesNotifier to populate the Students tab without N separate
+  // per-class queries.
+  static Future<List<StudentModel>> getAllStudentsForTeacher(
+          String teacherId) =>
+      _withFallback(
+        () async {
+          final snap = await _db
+              .collection(_kStudents)
+              .where('teacherId', isEqualTo: teacherId)
+              .get();
+          if (snap.docs.isEmpty) return null;
+          return snap.docs.map((doc) {
+            final d = doc.data();
+            return StudentModel.fromJson({
+              'id': doc.id,
+              'name': d['name'] ?? '',
+              'status': d['status'] ?? 'engaged',
+              'statusNote': d['statusNote'],
+              'classCode': d['classCode'],
+            });
+          }).toList();
+        },
+        () => MockDataService.getAllStudentsWithClassForTeacher(teacherId),
       );
 
   // ── Roster for a single class ──────────────────────────────────────────────
@@ -118,6 +164,6 @@ abstract final class FirebaseDataService {
             });
           }).toList();
         },
-        () => MockDataService.getRosterForClass(classCode),
+        () => MockDataService.getRosterForClassByTeacher(classCode, teacherId),
       );
 }

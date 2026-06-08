@@ -81,19 +81,19 @@ class LiveSessionCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
-                // Pill chips row
-                Row(
+                // Pill chips row — Wrap prevents overflow on narrow screens
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
                     _PillChip(
                       icon: Icons.timer_outlined,
                       label: '${sessionMinutes}m',
                     ),
-                    const SizedBox(width: 8),
                     _PillChip(
                       icon: Icons.trending_up,
                       label: trend,
                     ),
-                    const SizedBox(width: 8),
                     _PillChip(
                       icon: Icons.schedule_rounded,
                       label: period,

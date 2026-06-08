@@ -124,19 +124,7 @@ class ClassesScreen extends ConsumerWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person_add_outlined,
-                color: AppColors.primaryGreen),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: AppColors.primaryGreen,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add, color: Colors.white),
+        actions: const [],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16),
