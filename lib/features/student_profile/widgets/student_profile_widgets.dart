@@ -19,10 +19,9 @@ class ProfileHeaderCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar
           CircleAvatar(
             radius: 32,
-            backgroundColor: AppColors.sageLight,
+            backgroundColor: context.colorAvatarBg,
             child: Text(
               profile.name.isNotEmpty ? profile.name[0] : '?',
               style: const TextStyle(
@@ -38,40 +37,35 @@ class ProfileHeaderCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Name + badge
                 Row(
                   children: [
                     Expanded(
                       child: Text(
                         profile.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                          color: context.colorOnCard,
                         ),
                       ),
                     ),
                     SageChip(
                       label: profile.engagementLabel,
-                      backgroundColor: AppColors.sageLight,
-                      textColor: AppColors.primaryGreen,
                       fontSize: 10,
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
 
-                // Class · Subject
                 Text(
                   '${profile.className} · ${profile.subject}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.textSecondary,
+                    color: context.colorSubtle,
                   ),
                 ),
                 const SizedBox(height: 8),
 
-                // Stats row
                 Row(
                   children: [
                     const Icon(Icons.trending_up,
@@ -79,10 +73,10 @@ class ProfileHeaderCard extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       '${profile.avgEngagement}% Avg',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: context.colorOnCard,
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -91,10 +85,10 @@ class ProfileHeaderCard extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       '${profile.flags} Flags',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: context.colorOnCard,
                       ),
                     ),
                   ],
@@ -124,14 +118,16 @@ class EngagementTimelineCard extends StatelessWidget {
       return FlSpot(e.key.toDouble(), e.value.value);
     }).toList();
 
+    final borderColor = context.colorBorder;
+    final mutedColor = context.colorMuted;
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -140,23 +136,23 @@ class EngagementTimelineCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: context.colorOnCard,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
                       "Today's Session Activity",
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary,
+                        color: context.colorSubtle,
                       ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   border: Border.all(color: AppColors.primaryGreen),
                   borderRadius: BorderRadius.circular(20),
@@ -174,7 +170,6 @@ class EngagementTimelineCard extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // Chart
           SizedBox(
             height: 160,
             child: LineChart(
@@ -185,8 +180,8 @@ class EngagementTimelineCard extends StatelessWidget {
                   show: true,
                   drawVerticalLine: false,
                   horizontalInterval: 25,
-                  getDrawingHorizontalLine: (_) => const FlLine(
-                    color: AppColors.borderLight,
+                  getDrawingHorizontalLine: (_) => FlLine(
+                    color: borderColor,
                     strokeWidth: 1,
                   ),
                 ),
@@ -199,9 +194,9 @@ class EngagementTimelineCard extends StatelessWidget {
                       reservedSize: 30,
                       getTitlesWidget: (value, meta) => Text(
                         value.toInt().toString(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
-                          color: AppColors.textMuted,
+                          color: mutedColor,
                         ),
                       ),
                     ),
@@ -217,9 +212,9 @@ class EngagementTimelineCard extends StatelessWidget {
                         }
                         return Text(
                           timeline[idx].timeLabel,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 9,
-                            color: AppColors.textMuted,
+                            color: mutedColor,
                           ),
                         );
                       },
@@ -322,13 +317,13 @@ class _MetricChip extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 14, color: AppColors.textMuted),
+              Icon(icon, size: 14, color: context.colorMuted),
               const SizedBox(width: 6),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.textSecondary,
+                  color: context.colorSubtle,
                 ),
               ),
             ],
@@ -336,19 +331,18 @@ class _MetricChip extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '$value%',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+              color: context.colorOnCard,
             ),
           ),
           const SizedBox(height: 8),
-          // Progress bar
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: value / 100,
-              backgroundColor: AppColors.borderLight,
+              backgroundColor: context.colorBorder,
               valueColor: AlwaysStoppedAnimation<Color>(barColor),
               minHeight: 5,
             ),
@@ -376,16 +370,18 @@ class DroidInsightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bgColor =
+        context.isDark ? const Color(0xFF1E2B1A) : AppColors.sageLighter;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.sageLighter,
+        color: bgColor,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             children: [
               Container(
@@ -395,34 +391,33 @@ class DroidInsightCard extends StatelessWidget {
                   color: AppColors.primaryGreen,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.bolt, color: Colors.white, size: 18),
+                child: const Icon(Icons.bolt,
+                    color: Colors.white, size: 18),
               ),
               const SizedBox(width: 10),
-              const Text(
+              Text(
                 'Droid Insight',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: context.colorOnCard,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
 
-          // Italic quote text
           Text(
             '"$insightText"',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontStyle: FontStyle.italic,
-              color: AppColors.textSecondary,
+              color: context.colorSubtle,
               height: 1.5,
             ),
           ),
           const SizedBox(height: 14),
 
-          // Apply button
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
@@ -437,7 +432,8 @@ class DroidInsightCard extends StatelessWidget {
               ),
               child: const Text(
                 'Apply Interaction Tip',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                style:
+                    TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -467,17 +463,17 @@ class ObservationFilterChips extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.flag_outlined,
+            const Icon(Icons.flag_outlined,
                 size: 14, color: AppColors.warningAmber),
-            SizedBox(width: 6),
+            const SizedBox(width: 6),
             Text(
               'Active Observations',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: context.colorOnCard,
               ),
             ),
           ],
@@ -499,12 +495,12 @@ class ObservationFilterChips extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: isActive
                           ? AppColors.primaryGreen
-                          : AppColors.cardWhite,
+                          : context.colorCard,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: isActive
                             ? AppColors.primaryGreen
-                            : AppColors.borderLight,
+                            : context.colorBorder,
                       ),
                     ),
                     child: Text(
@@ -512,7 +508,9 @@ class ObservationFilterChips extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
-                        color: isActive ? Colors.white : AppColors.textPrimary,
+                        color: isActive
+                            ? Colors.white
+                            : context.colorOnCard,
                       ),
                     ),
                   ),
@@ -547,26 +545,20 @@ class ObservationCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Category + timestamp
           Row(
             children: [
-              SageChip(
-                label: observation.category,
-                backgroundColor: AppColors.sageLighter,
-                textColor: AppColors.primaryGreen,
-                fontSize: 11,
-              ),
+              SageChip(label: observation.category),
               const Spacer(),
               Row(
                 children: [
-                  const Icon(Icons.access_time,
-                      size: 11, color: AppColors.textMuted),
+                  Icon(Icons.access_time,
+                      size: 11, color: context.colorMuted),
                   const SizedBox(width: 3),
                   Text(
                     observation.timestamp,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.textMuted,
+                      color: context.colorMuted,
                     ),
                   ),
                 ],
@@ -575,18 +567,16 @@ class ObservationCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          // Note text
           Text(
             observation.text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: AppColors.textSecondary,
+              color: context.colorSubtle,
               height: 1.5,
             ),
           ),
           const SizedBox(height: 10),
 
-          // Edit / Delete
           Row(
             children: [
               GestureDetector(
@@ -624,7 +614,7 @@ class ObservationCard extends StatelessWidget {
 // Add / Edit Observation Bottom Sheet
 // ─────────────────────────────────────────────────────────────────────────────
 class AddEditObservationSheet extends StatefulWidget {
-  final ObservationModel? existing; // null = add mode
+  final ObservationModel? existing;
   final void Function(ObservationModel obs) onSave;
 
   const AddEditObservationSheet({
@@ -638,7 +628,8 @@ class AddEditObservationSheet extends StatefulWidget {
       _AddEditObservationSheetState();
 }
 
-class _AddEditObservationSheetState extends State<AddEditObservationSheet> {
+class _AddEditObservationSheetState
+    extends State<AddEditObservationSheet> {
   late final TextEditingController _textController;
   String _selectedCategory = 'Academic';
   final _categories = ['Academic', 'Behavior', 'Participation', 'Teamwork'];
@@ -676,27 +667,26 @@ class _AddEditObservationSheetState extends State<AddEditObservationSheet> {
   Widget build(BuildContext context) {
     final isEdit = widget.existing != null;
     return Padding(
-      // Shift up when keyboard is open
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: Container(
         padding: const EdgeInsets.all(20),
-        decoration: const BoxDecoration(
-          color: AppColors.cardWhite,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: context.colorCard,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Handle bar
             Center(
               child: Container(
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.borderLight,
+                  color: context.colorBorder,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -704,21 +694,20 @@ class _AddEditObservationSheetState extends State<AddEditObservationSheet> {
             const SizedBox(height: 16),
             Text(
               isEdit ? 'Edit Observation' : 'Add Observation',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: context.colorOnCard,
               ),
             ),
             const SizedBox(height: 16),
 
-            // Category selector
-            const Text(
+            Text(
               'Category',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
+                color: context.colorOnCard,
               ),
             ),
             const SizedBox(height: 8),
@@ -730,7 +719,8 @@ class _AddEditObservationSheetState extends State<AddEditObservationSheet> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: GestureDetector(
-                      onTap: () => setState(() => _selectedCategory = cat),
+                      onTap: () =>
+                          setState(() => _selectedCategory = cat),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
                         padding: const EdgeInsets.symmetric(
@@ -738,7 +728,7 @@ class _AddEditObservationSheetState extends State<AddEditObservationSheet> {
                         decoration: BoxDecoration(
                           color: isSelected
                               ? AppColors.primaryGreen
-                              : AppColors.backgroundLight,
+                              : context.colorBg,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -748,7 +738,7 @@ class _AddEditObservationSheetState extends State<AddEditObservationSheet> {
                             fontWeight: FontWeight.w500,
                             color: isSelected
                                 ? Colors.white
-                                : AppColors.textSecondary,
+                                : context.colorSubtle,
                           ),
                         ),
                       ),
@@ -759,13 +749,12 @@ class _AddEditObservationSheetState extends State<AddEditObservationSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Note text
-            const Text(
+            Text(
               'Note',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
+                color: context.colorOnCard,
               ),
             ),
             const SizedBox(height: 8),

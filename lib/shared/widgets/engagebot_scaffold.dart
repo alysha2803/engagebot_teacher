@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../app/theme/app_colors.dart';
 import '../../app/router/app_router.dart';
 
 /// Shell scaffold that wraps every main tab with the persistent bottom nav.
+/// All colours delegated to [BottomNavigationBarThemeData] in AppTheme.
 class EngagebotScaffold extends StatelessWidget {
   final Widget child;
 
@@ -50,11 +50,6 @@ class EngagebotScaffold extends StatelessWidget {
             label: 'Settings',
           ),
         ],
-        selectedItemColor: AppColors.primaryGreen,
-        unselectedItemColor: AppColors.textMuted,
-        backgroundColor: AppColors.cardWhite,
-        type: BottomNavigationBarType.fixed,
-        elevation: 8,
         selectedLabelStyle: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,

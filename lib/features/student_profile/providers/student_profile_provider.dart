@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/mock/mock_data_service.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/models/observation_model.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Student Profile state
@@ -35,12 +36,36 @@ class StudentProfileState {
 }
 
 class StudentProfileNotifier extends StateNotifier<StudentProfileState> {
-  StudentProfileNotifier(String studentId)
-      : super(StudentProfileState(
-          // TODO: Replace with droid student engagement API
-          profile: MockDataService.getStudentProfile(studentId),
-          observations: MockDataService.getObservations(),
-        ));
+  StudentProfileNotifier(String studentId, Ref ref)
+      : super(_buildInitialState(studentId, ref.read(studentEditsProvider))) {
+    // Re-apply whenever a student edit is committed (e.g. name changed from
+    // the dashboard roster) so the profile page stays in sync.
+    ref.listen<Map<String, StudentModel>>(
+      studentEditsProvider,
+      (_, edits) {
+        final override = edits[studentId];
+        if (override != null) {
+          state = state.copyWith(
+            profile: state.profile.copyWith(name: override.name),
+          );
+        }
+      },
+    );
+  }
+
+  static StudentProfileState _buildInitialState(
+      String studentId, Map<String, StudentModel> edits) {
+    final baseProfile = MockDataService.getStudentProfile(studentId);
+    // Apply any name override that was saved before this screen opened.
+    final override = edits[studentId];
+    final profile =
+        override != null ? baseProfile.copyWith(name: override.name) : baseProfile;
+    return StudentProfileState(
+      // TODO: Replace with droid student engagement API
+      profile: profile,
+      observations: MockDataService.getObservations(),
+    );
+  }
 
   void setFilter(String filter) => state = state.copyWith(activeFilter: filter);
 
@@ -71,5 +96,5 @@ class StudentProfileNotifier extends StateNotifier<StudentProfileState> {
 /// Family provider — keyed by studentId so each profile gets its own state.
 final studentProfileProvider = StateNotifierProvider.family<
     StudentProfileNotifier, StudentProfileState, String>(
-  (ref, studentId) => StudentProfileNotifier(studentId),
+  (ref, studentId) => StudentProfileNotifier(studentId, ref),
 );

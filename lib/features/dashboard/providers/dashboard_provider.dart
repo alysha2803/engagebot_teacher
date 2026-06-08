@@ -4,7 +4,16 @@ import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
 
 // ---------------------------------------------------------------------------
-// Live engagement state
+// Global student edits store
+// Persists name/status/note edits across class switches and provider rebuilds.
+// ---------------------------------------------------------------------------
+
+final studentEditsProvider = StateProvider<Map<String, StudentModel>>(
+  (ref) => {},
+);
+
+// ---------------------------------------------------------------------------
+// Dashboard state
 // ---------------------------------------------------------------------------
 
 class DashboardState {
@@ -43,20 +52,47 @@ class DashboardState {
 }
 
 class DashboardNotifier extends StateNotifier<DashboardState> {
-  DashboardNotifier()
+  final Ref _ref;
+
+  DashboardNotifier(this._ref)
       : super(DashboardState(
           liveEngagement: MockDataService.getLiveEngagement(),
           classes: MockDataService.getClasses(),
           selectedClassIndex: 0,
-          roster: MockDataService.getRoster(),
+          roster: MockDataService.getRosterForClass('1 USAHA'),
           aiRecommendation: MockDataService.getAIRecommendation(),
         ));
 
-  void selectClass(int index) =>
-      state = state.copyWith(selectedClassIndex: index);
+  /// Merge a freshly-loaded roster with any persisted edits from the global store.
+  List<StudentModel> _applyEdits(List<StudentModel> baseRoster) {
+    final edits = _ref.read(studentEditsProvider);
+    return baseRoster.map((s) => edits[s.id] ?? s).toList();
+  }
+
+  void selectClass(int index) {
+    final classCode = state.classes[index].code;
+    final baseRoster = MockDataService.getRosterForClass(classCode);
+    state = state.copyWith(
+      selectedClassIndex: index,
+      // Always re-apply edits so changes survive class switching.
+      roster: _applyEdits(baseRoster),
+    );
+  }
+
+  void editStudent(String studentId, StudentModel updated) {
+    // Persist to global store so other screens and future selectClass calls
+    // pick up the change without hitting MockDataService again.
+    _ref.read(studentEditsProvider.notifier).update(
+      (map) => {...map, studentId: updated},
+    );
+    // Refresh the visible roster immediately.
+    final roster =
+        state.roster.map((s) => s.id == studentId ? updated : s).toList();
+    state = state.copyWith(roster: roster);
+  }
 }
 
 final dashboardProvider =
     StateNotifierProvider<DashboardNotifier, DashboardState>(
-  (ref) => DashboardNotifier(),
+  (ref) => DashboardNotifier(ref),
 );

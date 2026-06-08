@@ -1,39 +1,45 @@
 import 'package:flutter/material.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../data/models/class_model.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import '../providers/classes_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Search bar
 // ─────────────────────────────────────────────────────────────────────────────
+
 class ClassSearchBar extends StatelessWidget {
   final ValueChanged<String> onChanged;
+  final VoidCallback onFilter;
 
-  const ClassSearchBar({super.key, required this.onChanged});
+  const ClassSearchBar({
+    super.key,
+    required this.onChanged,
+    required this.onFilter,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.cardWhite,
+        color: context.colorCard,
         borderRadius: BorderRadius.circular(14),
         boxShadow: AppColors.cardShadow,
       ),
       child: TextField(
         onChanged: onChanged,
-        style: const TextStyle(
-          fontSize: 14,
-          color: AppColors.textPrimary,
-        ),
+        style: TextStyle(fontSize: 14, color: context.colorOnCard),
         decoration: InputDecoration(
           hintText: 'Search students or classes...',
-          hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+          hintStyle: TextStyle(color: context.colorMuted, fontSize: 14),
           prefixIcon:
-              const Icon(Icons.search, color: AppColors.textMuted, size: 20),
-          suffixIcon:
-              const Icon(Icons.tune, color: AppColors.textMuted, size: 20),
+              Icon(Icons.search, color: context.colorMuted, size: 20),
+          suffixIcon: GestureDetector(
+            onTap: onFilter,
+            child: const Icon(Icons.tune,
+                color: AppColors.primaryGreen, size: 20),
+          ),
           filled: true,
-          fillColor: AppColors.cardWhite,
+          fillColor: context.colorCard,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: BorderSide.none,
@@ -47,10 +53,11 @@ class ClassSearchBar extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Period / Roster segmented toggle
+// Periods / Students segmented toggle
 // ─────────────────────────────────────────────────────────────────────────────
+
 class PeriodRosterToggle extends StatelessWidget {
-  final bool isPeriods; // true = Periods selected
+  final bool isPeriods;
   final ValueChanged<bool> onToggle;
 
   const PeriodRosterToggle({
@@ -63,7 +70,7 @@ class PeriodRosterToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F0EC),
+        color: context.colorChipBg,
         borderRadius: BorderRadius.circular(12),
       ),
       padding: const EdgeInsets.all(4),
@@ -75,7 +82,7 @@ class PeriodRosterToggle extends StatelessWidget {
             onTap: () => onToggle(true),
           ),
           _Tab(
-            label: 'Roster',
+            label: 'Students',
             isSelected: !isPeriods,
             onTap: () => onToggle(false),
           ),
@@ -105,7 +112,8 @@ class _Tab extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.cardWhite : Colors.transparent,
+            color:
+                isSelected ? context.colorCard : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             boxShadow: isSelected ? AppColors.cardShadow : [],
           ),
@@ -114,11 +122,12 @@ class _Tab extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight:
-                    isSelected ? FontWeight.w600 : FontWeight.w400,
+                fontWeight: isSelected
+                    ? FontWeight.w600
+                    : FontWeight.w400,
                 color: isSelected
-                    ? AppColors.textPrimary
-                    : AppColors.textMuted,
+                    ? context.colorOnCard
+                    : context.colorMuted,
               ),
             ),
           ),
@@ -129,8 +138,9 @@ class _Tab extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2-column class grid
+// 2-column class grid (Periods tab)
 // ─────────────────────────────────────────────────────────────────────────────
+
 class ClassGrid extends StatelessWidget {
   final List<ClassModel> classes;
   final void Function(ClassModel cls) onTap;
@@ -140,12 +150,12 @@ class ClassGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (classes.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(32),
+          padding: const EdgeInsets.all(32),
           child: Text(
             'No classes found',
-            style: TextStyle(color: AppColors.textMuted),
+            style: TextStyle(color: context.colorMuted),
           ),
         ),
       );
@@ -170,6 +180,7 @@ class ClassGrid extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // Individual class card
 // ─────────────────────────────────────────────────────────────────────────────
+
 class ClassCard extends StatelessWidget {
   final ClassModel cls;
   final VoidCallback onTap;
@@ -185,34 +196,42 @@ class ClassCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppColors.cardWhite,
+          color: context.colorCard,
           borderRadius: BorderRadius.circular(16),
           boxShadow: AppColors.cardShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Online/Offline badge top-right
             Align(
               alignment: Alignment.topRight,
-              child: SageChip(
-                label: cls.status,
-                backgroundColor: isOnline
-                    ? AppColors.sageLighter
-                    : const Color(0xFFF3F4F6),
-                textColor: isOnline
-                    ? AppColors.primaryGreen
-                    : AppColors.textMuted,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isOnline
+                      ? context.colorIconBg
+                      : context.colorBorder.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  cls.status,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isOnline
+                        ? AppColors.primaryGreen
+                        : context.colorMuted,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 4),
-
-            // Clock icon
             Container(
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: AppColors.sageLighter,
+                color: context.colorIconBg,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
@@ -222,49 +241,265 @@ class ClassCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-
-            // Class code
             Text(
               cls.code,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
-                color: AppColors.textMuted,
+                color: context.colorMuted,
                 fontWeight: FontWeight.w500,
               ),
             ),
             const SizedBox(height: 2),
-
-            // Subject name
             Text(
               cls.subject,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: context.colorOnCard,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             const Spacer(),
-
-            // Student count
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.group_outlined,
                   size: 14,
-                  color: AppColors.textMuted,
+                  color: context.colorMuted,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   '${cls.studentCount} Students',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textMuted,
+                    color: context.colorMuted,
                   ),
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Student Attention List (Students tab)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class StudentAttentionList extends StatelessWidget {
+  final List<StudentWithClass> students;
+  final void Function(StudentWithClass sw) onTap;
+
+  const StudentAttentionList({
+    super.key,
+    required this.students,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (students.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            'No students found',
+            style: TextStyle(color: context.colorMuted),
+          ),
+        ),
+      );
+    }
+
+    final needsAttention =
+        students.where((s) => s.student.status != 'engaged').toList();
+    final engaged =
+        students.where((s) => s.student.status == 'engaged').toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (needsAttention.isNotEmpty) ...[
+          _SectionHeader(
+            icon: Icons.flag_rounded,
+            label: 'Needs Attention',
+            count: needsAttention.length,
+            iconColor: AppColors.liveRed,
+          ),
+          const SizedBox(height: 8),
+          ...needsAttention.map(
+            (sw) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _StudentRow(sw: sw, onTap: () => onTap(sw)),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        if (engaged.isNotEmpty) ...[
+          _SectionHeader(
+            icon: Icons.check_circle_outline,
+            label: 'Engaged',
+            count: engaged.length,
+            iconColor: AppColors.successGreen,
+          ),
+          const SizedBox(height: 8),
+          ...engaged.map(
+            (sw) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _StudentRow(sw: sw, onTap: () => onTap(sw)),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int count;
+  final Color iconColor;
+
+  const _SectionHeader({
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: iconColor),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: context.colorOnCard,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+          decoration: BoxDecoration(
+            color: context.colorIconBg,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '$count',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primaryGreen,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StudentRow extends StatelessWidget {
+  final StudentWithClass sw;
+  final VoidCallback onTap;
+
+  const _StudentRow({required this.sw, required this.onTap});
+
+  Color get _statusColor => switch (sw.student.status) {
+        'flagged' => AppColors.liveRed,
+        'distracted' => AppColors.warningAmber,
+        _ => AppColors.successGreen,
+      };
+
+  String get _statusLabel {
+    final s = sw.student.status;
+    return s[0].toUpperCase() + s.substring(1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.colorCard,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: AppColors.cardShadow,
+          border: Border(
+            left: BorderSide(color: _statusColor, width: 4),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(
+            horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: context.colorAvatarBg,
+              child: Text(
+                sw.student.name.isNotEmpty
+                    ? sw.student.name[0]
+                    : '?',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primaryGreen,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    sw.student.name,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: context.colorOnCard,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    sw.classCode,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.colorSubtle,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _statusColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                _statusLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: _statusColor,
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right, size: 18, color: context.colorMuted),
           ],
         ),
       ),
@@ -292,16 +527,17 @@ class DroidInsightsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.info_outline, size: 16, color: AppColors.textSecondary),
-            SizedBox(width: 6),
+            Icon(Icons.info_outline,
+                size: 16, color: context.colorSubtle),
+            const SizedBox(width: 6),
             Text(
               'Droid Insights',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: context.colorOnCard,
               ),
             ),
           ],
@@ -310,7 +546,7 @@ class DroidInsightsSection extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.cardWhite,
+            color: context.colorCard,
             borderRadius: BorderRadius.circular(14),
             boxShadow: AppColors.cardShadow,
           ),
@@ -320,7 +556,7 @@ class DroidInsightsSection extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: AppColors.sageLighter,
+                  color: context.colorIconBg,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -336,18 +572,18 @@ class DroidInsightsSection extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: context.colorOnCard,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       description,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary,
+                        color: context.colorSubtle,
                       ),
                     ),
                   ],

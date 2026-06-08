@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../app/theme/app_colors.dart';
 
-/// Sage-background card showing AI-generated teaching recommendation.
+/// Card showing AI-generated teaching recommendation.
 // TODO: Replace with droid AI recommendation API
 class AIRecommendationCard extends StatelessWidget {
   final String text;
@@ -19,10 +19,17 @@ class AIRecommendationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bgColor = context.isDark
+        ? const Color(0xFF1E2B1A)
+        : AppColors.sageLighter;
+    final iconBg = context.isDark
+        ? const Color(0xFF253020)
+        : AppColors.sageLight;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.sageLighter,
+        color: bgColor,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -35,7 +42,7 @@ class AIRecommendationCard extends StatelessWidget {
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: AppColors.sageLight,
+                  color: iconBg,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -64,11 +71,9 @@ class AIRecommendationCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          // Body text with highlighted keyword
-          _buildHighlightedText(text, highlightWord),
+          _buildHighlightedText(context, text, highlightWord),
           const SizedBox(height: 10),
 
-          // Action link
           GestureDetector(
             onTap: onApply,
             child: Row(
@@ -90,8 +95,9 @@ class AIRecommendationCard extends StatelessWidget {
     );
   }
 
-  /// Builds a RichText that highlights [keyword] inside [fullText].
-  Widget _buildHighlightedText(String fullText, String keyword) {
+  Widget _buildHighlightedText(
+      BuildContext context, String fullText, String keyword) {
+    final subtleColor = context.colorSubtle;
     final lowerText = fullText.toLowerCase();
     final lowerKw = keyword.toLowerCase();
     final startIdx = lowerText.indexOf(lowerKw);
@@ -99,25 +105,18 @@ class AIRecommendationCard extends StatelessWidget {
     if (startIdx == -1) {
       return Text(
         fullText,
-        style: const TextStyle(
-          fontSize: 13,
-          color: AppColors.textSecondary,
-          height: 1.5,
-        ),
+        style: TextStyle(fontSize: 13, color: subtleColor, height: 1.5),
       );
     }
 
     final before = fullText.substring(0, startIdx);
-    final highlighted = fullText.substring(startIdx, startIdx + keyword.length);
+    final highlighted =
+        fullText.substring(startIdx, startIdx + keyword.length);
     final after = fullText.substring(startIdx + keyword.length);
 
     return RichText(
       text: TextSpan(
-        style: const TextStyle(
-          fontSize: 13,
-          color: AppColors.textSecondary,
-          height: 1.5,
-        ),
+        style: TextStyle(fontSize: 13, color: subtleColor, height: 1.5),
         children: [
           TextSpan(text: before),
           TextSpan(
