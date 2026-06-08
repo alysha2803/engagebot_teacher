@@ -3,7 +3,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../data/models/student_model.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 
-/// White card containing the 3-column student avatar grid with status dots.
+/// Card containing the 3-column student avatar grid with status dots.
 // TODO: Replace with live droid roster data
 class ClassRosterSection extends StatelessWidget {
   final List<StudentModel> students;
@@ -30,29 +30,26 @@ class ClassRosterSection extends StatelessWidget {
           children: [
             RichText(
               text: TextSpan(
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: context.colorOnCard,
                 ),
                 children: [
                   const TextSpan(text: 'Class Roster '),
                   TextSpan(
                     text: '· $onlineCount Online',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w400,
-                      color: AppColors.textSecondary,
+                      color: context.colorSubtle,
                     ),
                   ),
                 ],
               ),
             ),
-            const Text(
+            Text(
               'Auto-refreshing',
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.textMuted,
-              ),
+              style: TextStyle(fontSize: 11, color: context.colorMuted),
             ),
           ],
         ),
@@ -70,7 +67,6 @@ class ClassRosterSection extends StatelessWidget {
               mainAxisSpacing: 20,
               childAspectRatio: 0.85,
             ),
-            // +1 for the Manage cell
             itemCount: students.length + 1,
             itemBuilder: (context, index) {
               if (index == students.length) {
@@ -91,9 +87,9 @@ class ClassRosterSection extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 // Student avatar tile
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _StudentAvatarTile extends StatelessWidget {
   final StudentModel student;
@@ -112,7 +108,7 @@ class _StudentAvatarTile extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 30,
-                backgroundColor: AppColors.sageLight,
+                backgroundColor: context.colorAvatarBg,
                 child: Text(
                   student.name.isNotEmpty ? student.name[0] : '?',
                   style: const TextStyle(
@@ -132,10 +128,10 @@ class _StudentAvatarTile extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             student.name,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
+              color: context.colorOnCard,
             ),
             overflow: TextOverflow.ellipsis,
           ),
@@ -145,9 +141,9 @@ class _StudentAvatarTile extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Manage cell — opens edit-students bottom sheet
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// Manage cell
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _ManageCell extends StatelessWidget {
   final List<StudentModel> students;
@@ -181,8 +177,8 @@ class _ManageCell extends StatelessWidget {
             height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.borderLight, width: 2),
-              color: AppColors.backgroundLight,
+              border: Border.all(color: context.colorBorder, width: 2),
+              color: context.colorBg,
             ),
             child: const Icon(
               Icons.edit_outlined,
@@ -205,9 +201,9 @@ class _ManageCell extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 // Edit Students bottom sheet
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _EditStudentsSheet extends StatefulWidget {
   final List<StudentModel> students;
@@ -233,9 +229,8 @@ class _EditStudentsSheetState extends State<_EditStudentsSheet> {
 
   void _handleEdit(StudentModel updated) {
     setState(() {
-      _students = _students
-          .map((s) => s.id == updated.id ? updated : s)
-          .toList();
+      _students =
+          _students.map((s) => s.id == updated.id ? updated : s).toList();
     });
     widget.onStudentEdited(updated);
   }
@@ -243,9 +238,10 @@ class _EditStudentsSheetState extends State<_EditStudentsSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colorCard,
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.fromLTRB(
         20,
@@ -261,7 +257,7 @@ class _EditStudentsSheetState extends State<_EditStudentsSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: AppColors.borderLight,
+              color: context.colorBorder,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -270,12 +266,12 @@ class _EditStudentsSheetState extends State<_EditStudentsSheet> {
           // Header
           Row(
             children: [
-              const Text(
+              Text(
                 'Edit Students',
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: context.colorOnCard,
                 ),
               ),
               const Spacer(),
@@ -288,10 +284,9 @@ class _EditStudentsSheetState extends State<_EditStudentsSheet> {
               ),
             ],
           ),
-          const Divider(height: 8),
+          Divider(height: 8, color: context.colorBorder),
           const SizedBox(height: 4),
 
-          // Student list
           ..._students.map(
             (student) => _StudentEditRow(
               student: student,
@@ -304,9 +299,9 @@ class _EditStudentsSheetState extends State<_EditStudentsSheet> {
   }
 }
 
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 // Individual row inside the edit sheet
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _StudentEditRow extends StatelessWidget {
   final StudentModel student;
@@ -329,9 +324,10 @@ class _StudentEditRow extends StatelessWidget {
     final hasNote =
         student.statusNote != null && student.statusNote!.isNotEmpty;
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
       leading: CircleAvatar(
-        backgroundColor: AppColors.sageLight,
+        backgroundColor: context.colorAvatarBg,
         child: Text(
           student.name.isNotEmpty ? student.name[0] : '?',
           style: const TextStyle(
@@ -342,9 +338,9 @@ class _StudentEditRow extends StatelessWidget {
       ),
       title: Text(
         student.name,
-        style: const TextStyle(
+        style: TextStyle(
           fontWeight: FontWeight.w500,
-          color: AppColors.textPrimary,
+          color: context.colorOnCard,
         ),
       ),
       subtitle: Column(
@@ -363,9 +359,9 @@ class _StudentEditRow extends StatelessWidget {
               padding: const EdgeInsets.only(top: 2),
               child: Text(
                 'Note: ${student.statusNote}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.textMuted,
+                  color: context.colorMuted,
                   fontStyle: FontStyle.italic,
                 ),
                 maxLines: 1,
@@ -385,23 +381,17 @@ class _StudentEditRow extends StatelessWidget {
   String _statusLabel(String status) =>
       status[0].toUpperCase() + status.substring(1);
 
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'engaged':
-        return AppColors.successGreen;
-      case 'distracted':
-        return AppColors.liveRed;
-      case 'flagged':
-        return AppColors.warningAmber;
-      default:
-        return AppColors.textMuted;
-    }
-  }
+  Color _statusColor(String status) => switch (status) {
+        'engaged' => AppColors.successGreen,
+        'distracted' => AppColors.warningAmber,
+        'flagged' => AppColors.liveRed,
+        _ => AppColors.textMuted,
+      };
 }
 
-// ---------------------------------------------------------------------------
-// Edit student dialog — name field + status selector
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// Edit student dialog
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _EditStudentDialog extends StatefulWidget {
   final StudentModel student;
@@ -424,7 +414,8 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.student.name);
-    _noteController = TextEditingController(text: widget.student.statusNote ?? '');
+    _noteController =
+        TextEditingController(text: widget.student.statusNote ?? '');
     _selectedStatus = widget.student.status;
   }
 
@@ -435,29 +426,24 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
     super.dispose();
   }
 
-  Color _chipColor(String status) {
-    switch (status) {
-      case 'engaged':
-        return AppColors.successGreen;
-      case 'distracted':
-        return AppColors.liveRed;
-      case 'flagged':
-        return AppColors.warningAmber;
-      default:
-        return AppColors.textMuted;
-    }
-  }
+  Color _chipColor(String status) => switch (status) {
+        'engaged' => AppColors.successGreen,
+        'distracted' => AppColors.warningAmber,
+        'flagged' => AppColors.liveRed,
+        _ => AppColors.textMuted,
+      };
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text(
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
         'Edit Student',
         style: TextStyle(
           fontSize: 17,
           fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
+          color: context.colorOnCard,
         ),
       ),
       content: Column(
@@ -469,11 +455,8 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
             controller: _nameController,
             decoration: InputDecoration(
               labelText: 'Name',
-              labelStyle:
-                  const TextStyle(color: AppColors.textSecondary),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+                  borderRadius: BorderRadius.circular(10)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide:
@@ -485,13 +468,12 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
           ),
           const SizedBox(height: 20),
 
-          // Status selector
-          const Text(
+          Text(
             'Status',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
+              color: context.colorSubtle,
             ),
           ),
           const SizedBox(height: 10),
@@ -503,17 +485,21 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
                 child: Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: GestureDetector(
-                    onTap: () => setState(() => _selectedStatus = s),
+                    onTap: () =>
+                        setState(() => _selectedStatus = s),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
                         color: selected
                             ? color.withValues(alpha: 0.12)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: selected ? color : AppColors.borderLight,
+                          color: selected
+                              ? color
+                              : context.colorBorder,
                           width: selected ? 1.5 : 1,
                         ),
                       ),
@@ -525,7 +511,9 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
                           fontWeight: selected
                               ? FontWeight.w700
                               : FontWeight.normal,
-                          color: selected ? color : AppColors.textMuted,
+                          color: selected
+                              ? color
+                              : context.colorMuted,
                         ),
                       ),
                     ),
@@ -536,19 +524,15 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
           ),
           const SizedBox(height: 20),
 
-          // Reasoning note
           TextField(
             controller: _noteController,
             maxLines: 3,
             decoration: InputDecoration(
               labelText: 'Reason / Note (optional)',
               hintText: 'e.g. Distracted during group activity',
-              labelStyle:
-                  const TextStyle(color: AppColors.textSecondary),
               alignLabelWithHint: true,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+                  borderRadius: BorderRadius.circular(10)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide:
@@ -565,10 +549,8 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text(
-            'Cancel',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
+          child: Text('Cancel',
+              style: TextStyle(color: context.colorSubtle)),
         ),
         ElevatedButton(
           onPressed: () {
@@ -585,11 +567,8 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
             Navigator.of(context).pop();
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryGreen,
-            foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+                borderRadius: BorderRadius.circular(10)),
           ),
           child: const Text('Save'),
         ),

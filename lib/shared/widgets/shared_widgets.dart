@@ -36,8 +36,8 @@ class StatusDot extends StatelessWidget {
 
   Color get _color => switch (status) {
         'engaged' => AppColors.successGreen,
-        'distracted' => AppColors.liveRed,
-        'flagged' => AppColors.warningAmber,
+        'distracted' => AppColors.warningAmber,
+        'flagged' => AppColors.liveRed,
         _ => AppColors.textMuted,
       };
 
@@ -49,7 +49,10 @@ class StatusDot extends StatelessWidget {
       decoration: BoxDecoration(
         color: _color,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 1.5),
+        border: Border.all(
+          color: context.colorCard,
+          width: 1.5,
+        ),
       ),
     );
   }
@@ -58,14 +61,14 @@ class StatusDot extends StatelessWidget {
 /// Reusable pill/chip with rounded border.
 class SageChip extends StatelessWidget {
   final String label;
-  final Color backgroundColor;
+  final Color? backgroundColor;
   final Color textColor;
   final double fontSize;
 
   const SageChip({
     super.key,
     required this.label,
-    this.backgroundColor = AppColors.sageLight,
+    this.backgroundColor,
     this.textColor = AppColors.primaryGreen,
     this.fontSize = 11,
   });
@@ -75,7 +78,7 @@ class SageChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: backgroundColor ?? context.colorIconBg,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -104,10 +107,10 @@ class SectionHeader extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+            color: context.colorOnCard,
           ),
         ),
         if (trailing != null) trailing!,
@@ -116,18 +119,19 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-/// A standard white card with rounded corners and subtle shadow.
+/// A standard card with rounded corners and subtle shadow.
+/// Defaults to the theme surface colour; pass [color] to override.
 class AppCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
-  final Color color;
+  final Color? color;
   final double borderRadius;
 
   const AppCard({
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(16),
-    this.color = AppColors.cardWhite,
+    this.color,
     this.borderRadius = 16,
   });
 
@@ -136,7 +140,7 @@ class AppCard extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: color,
+        color: color ?? context.colorCard,
         borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: AppColors.cardShadow,
       ),

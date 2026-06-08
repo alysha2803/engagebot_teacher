@@ -30,14 +30,17 @@ class ClassSelectorRow extends StatelessWidget {
             onTap: () => onSelect(index),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primaryGreen : AppColors.cardWhite,
+                color: isSelected
+                    ? AppColors.primaryGreen
+                    : context.colorCard,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: isSelected
                       ? AppColors.primaryGreen
-                      : AppColors.borderLight,
+                      : context.colorBorder,
                 ),
                 boxShadow: isSelected ? AppColors.cardShadow : [],
               ),
@@ -52,7 +55,7 @@ class ClassSelectorRow extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                       color: isSelected
                           ? Colors.white70
-                          : AppColors.textMuted,
+                          : context.colorMuted,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -61,7 +64,9 @@ class ClassSelectorRow extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: isSelected ? Colors.white : AppColors.textPrimary,
+                      color: isSelected
+                          ? Colors.white
+                          : context.colorOnCard,
                     ),
                   ),
                 ],

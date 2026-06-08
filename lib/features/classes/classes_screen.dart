@@ -110,7 +110,6 @@ class ClassesScreen extends ConsumerWidget {
     final isPeriods = state.activeTab == ClassesTab.periods;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         leading: const Padding(
           padding: EdgeInsets.all(10),
@@ -121,7 +120,6 @@ class ClassesScreen extends ConsumerWidget {
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
           ),
         ),
         actions: [
@@ -160,7 +158,7 @@ class ClassesScreen extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.sageLighter,
+                      color: context.colorIconBg,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(

@@ -48,12 +48,9 @@ class StudentProfileScreen extends ConsumerWidget {
     final profile = state.profile;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
-        backgroundColor: AppColors.cardWhite,
         leading: IconButton(
-          icon: const Icon(Icons.chevron_left,
-              color: AppColors.textPrimary, size: 28),
+          icon: const Icon(Icons.chevron_left, size: 28),
           onPressed: () {
             if (context.canPop()) {
               context.pop();
@@ -67,12 +64,11 @@ class StudentProfileScreen extends ConsumerWidget {
           style: const TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_horiz, color: AppColors.textSecondary),
+            icon: const Icon(Icons.more_horiz),
             onPressed: () {},
           ),
         ],
@@ -124,12 +120,12 @@ class StudentProfileScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Teacher Observations',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: context.colorOnCard,
                   ),
                 ),
                 GestureDetector(
@@ -156,12 +152,12 @@ class StudentProfileScreen extends ConsumerWidget {
 
             // Observation list
             if (state.observations.isEmpty)
-              const Center(
+              Center(
                 child: Padding(
-                  padding: EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(24),
                   child: Text(
                     'No observations yet. Tap + Add Note to begin.',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                    style: TextStyle(color: context.colorMuted, fontSize: 13),
                     textAlign: TextAlign.center,
                   ),
                 ),

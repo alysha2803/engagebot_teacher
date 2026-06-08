@@ -26,13 +26,9 @@ class ClassAnalyticsScreen extends StatelessWidget {
     final onlineCount = roster.where((s) => s.status == 'engaged').length;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
-        backgroundColor: AppColors.cardWhite,
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.chevron_left,
-              color: AppColors.textPrimary, size: 28),
+          icon: const Icon(Icons.chevron_left, size: 28),
           onPressed: () {
             if (context.canPop()) {
               context.pop();
@@ -48,23 +44,20 @@ class ClassAnalyticsScreen extends StatelessWidget {
             Text(
               cls.code,
               style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
+                  fontSize: 17, fontWeight: FontWeight.w600),
             ),
             Text(
               cls.subject,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.6)),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_horiz, color: AppColors.textSecondary),
+            icon: const Icon(Icons.more_horiz),
             onPressed: () {},
           ),
         ],
@@ -311,10 +304,10 @@ class _StudentTile extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             student.name,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
+              color: context.colorOnCard,
             ),
             overflow: TextOverflow.ellipsis,
           ),

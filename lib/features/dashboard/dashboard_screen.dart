@@ -19,9 +19,7 @@ class DashboardScreen extends ConsumerWidget {
     final notifier = ref.read(dashboardProvider.notifier);
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
-        backgroundColor: AppColors.cardWhite,
         leading: const Padding(
           padding: EdgeInsets.all(10),
           child: AppLogo(size: 32),
@@ -31,7 +29,6 @@ class DashboardScreen extends ConsumerWidget {
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
           ),
         ),
         actions: [
