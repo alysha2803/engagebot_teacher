@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/mock/mock_data_service.dart';
+import '../../../data/services/firebase_data_service.dart';
+import '../../auth/providers/auth_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // State
@@ -46,8 +48,22 @@ class PreferencesState {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class SettingsNotifier extends StateNotifier<PreferencesState> {
-  SettingsNotifier()
-      : super(_buildInitial());
+  final Ref _ref;
+
+  SettingsNotifier(this._ref) : super(_buildInitial()) {
+    // Listen for sign-in after the notifier is created (e.g., user signs in
+    // while the settings screen is still in the widget tree).
+    _ref.listen<String?>(currentTeacherIdProvider, (_, next) {
+      if (next != null && next.isNotEmpty) refreshFromFirebase(next);
+    });
+
+    // Immediate load if the user was already authenticated when this provider
+    // was first created (e.g., restored session on app restart).
+    Future.microtask(() {
+      final id = _ref.read(currentTeacherIdProvider);
+      if (id != null && id.isNotEmpty) refreshFromFirebase(id);
+    });
+  }
 
   static PreferencesState _buildInitial() {
     final defaults = MockDataService.getDefaultPreferences();
@@ -59,6 +75,17 @@ class SettingsNotifier extends StateNotifier<PreferencesState> {
       darkMode: false,
       teacherName: teacher.name,
       teacherSchool: teacher.school,
+    );
+  }
+
+  // Overwrite name/school with Firestore data (falls back to mock if empty).
+  Future<void> refreshFromFirebase(String teacherId) async {
+    final profile = await FirebaseDataService.getTeacherProfile(teacherId);
+    if (!mounted) return;
+    state = state.copyWith(
+      teacherName: profile.name.isNotEmpty ? profile.name : state.teacherName,
+      teacherSchool:
+          profile.school.isNotEmpty ? profile.school : state.teacherSchool,
     );
   }
 
@@ -108,5 +135,5 @@ class SettingsNotifier extends StateNotifier<PreferencesState> {
 
 final settingsProvider =
     StateNotifierProvider<SettingsNotifier, PreferencesState>(
-  (ref) => SettingsNotifier(),
+  (ref) => SettingsNotifier(ref),
 );

@@ -1,4 +1,5 @@
-// ignore: unused_import — needed for Widget type in builder closures via go_router
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/login_screen.dart';
@@ -25,30 +26,40 @@ abstract final class AppRoutes {
 GoRouter buildAppRouter() {
   return GoRouter(
     initialLocation: AppRoutes.login,
+
+    // Re-evaluate redirect whenever Firebase auth state changes.
+    refreshListenable: _AuthStateNotifier(),
+
+    // Auth guard: redirect unauthenticated users to /login,
+    // and skip /login for already-authenticated users.
+    redirect: (context, state) {
+      final isLoggedIn = FirebaseAuth.instance.currentUser != null;
+      final onLogin = state.matchedLocation == AppRoutes.login;
+      if (!isLoggedIn && !onLogin) return AppRoutes.login;
+      if (isLoggedIn && onLogin) return AppRoutes.dashboard;
+      return null;
+    },
+
     routes: [
-      // ── Auth — standalone, no shell ──────────────────────────────────────
+      // ── Auth — standalone, no shell ────────────────────────────────────
       GoRoute(
         path: AppRoutes.login,
         name: 'login',
         builder: (context, state) => const LoginScreen(),
       ),
 
-      // ── Class Analytics — no bottom nav ──────────────────────────────────
-      // Pushed from Dashboard (Select Class) or Classes (class card tap).
+      // ── Class Analytics — no bottom nav ────────────────────────────────
       GoRoute(
         path: AppRoutes.classDetail,
         name: 'classDetail',
         builder: (context, state) {
-          final classCode = Uri.decodeComponent(
-              state.pathParameters['classCode'] ?? '');
+          final classCode =
+              Uri.decodeComponent(state.pathParameters['classCode'] ?? '');
           return ClassAnalyticsScreen(classCode: classCode);
         },
       ),
 
-      // ── Student Profile — no bottom nav ──────────────────────────────────
-      // Pushed from ClassAnalytics roster or Dashboard roster.
-      // When navigated via context.go with ?back=classes, the back button
-      // goes to /classes instead of popping (used from Dashboard roster).
+      // ── Student Profile — no bottom nav ────────────────────────────────
       GoRoute(
         path: AppRoutes.studentProfile,
         name: 'studentProfile',
@@ -58,7 +69,7 @@ GoRouter buildAppRouter() {
         },
       ),
 
-      // ── Main shell with bottom navigation ────────────────────────────────
+      // ── Main shell with bottom navigation ──────────────────────────────
       ShellRoute(
         builder: (context, state, child) => EngagebotScaffold(child: child),
         routes: [
@@ -86,4 +97,23 @@ GoRouter buildAppRouter() {
       ),
     ],
   );
+}
+
+/// Notifies GoRouter whenever the Firebase auth state changes so the
+/// redirect function is re-evaluated (sign-in → goes to /dashboard,
+/// sign-out → goes to /login).
+class _AuthStateNotifier extends ChangeNotifier {
+  late final StreamSubscription<User?> _sub;
+
+  _AuthStateNotifier() {
+    _sub = FirebaseAuth.instance
+        .authStateChanges()
+        .listen((_) => notifyListeners());
+  }
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
 }
