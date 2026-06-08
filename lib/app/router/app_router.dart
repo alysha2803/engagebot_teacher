@@ -8,7 +8,7 @@ import '../../features/classes/classes_screen.dart';
 import '../../features/class_analytics/class_analytics_screen.dart';
 import '../../features/student_profile/student_profile_screen.dart';
 import '../../features/reports/reports_screen.dart';
-import '../../features/settings/settings_screen.dart';
+import '../../features/ai_recommendation/ai_recommendation_screen.dart';
 import '../../shared/widgets/engagebot_scaffold.dart';
 
 /// Named route constants — use these everywhere instead of raw strings.
@@ -19,7 +19,7 @@ abstract final class AppRoutes {
   static const classDetail = '/class-detail/:classCode';
   static const studentProfile = '/students/:studentId';
   static const reports = '/reports';
-  static const settings = '/settings';
+  static const recommendations = '/recommendations';
 }
 
 /// Builds and returns the GoRouter for the app.
@@ -89,9 +89,9 @@ GoRouter buildAppRouter() {
             builder: (context, state) => const ReportsScreen(),
           ),
           GoRoute(
-            path: AppRoutes.settings,
-            name: 'settings',
-            builder: (context, state) => const SettingsScreen(),
+            path: AppRoutes.recommendations,
+            name: 'recommendations',
+            builder: (context, state) => const AIRecommendationScreen(),
           ),
         ],
       ),

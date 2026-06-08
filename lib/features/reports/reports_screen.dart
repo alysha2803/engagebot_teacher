@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/app_colors.dart';
 import '../../data/mock/mock_data_service.dart';
+import '../../shared/widgets/engagebot_scaffold.dart';
 import '../../data/models/export_history_model.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import 'providers/reports_provider.dart';
@@ -436,6 +437,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          onPressed: () =>
+              EngagebotDrawer.maybeOf(context)?.openDrawer(),
+        ),
         title: const Text(
           'Reports & Export',
           style: TextStyle(

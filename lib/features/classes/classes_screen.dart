@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
-import '../../shared/widgets/shared_widgets.dart';
+import '../../shared/widgets/engagebot_scaffold.dart';
 import '../../data/mock/mock_data_service.dart';
 import 'providers/classes_provider.dart';
 import 'widgets/classes_widgets.dart';
@@ -112,9 +112,10 @@ class ClassesScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: const Padding(
-          padding: EdgeInsets.all(10),
-          child: AppLogo(size: 32),
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          onPressed: () =>
+              EngagebotDrawer.maybeOf(context)?.openDrawer(),
         ),
         title: const Text(
           'Classes & Students',
