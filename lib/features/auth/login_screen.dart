@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../app/theme/app_colors.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import 'providers/auth_provider.dart';
+
+const _kSage = Color(0xFF9CAF88);
+const _kTitleColor = Color(0xFF1A2214);
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -26,89 +30,80 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    final isLoading = authState.status == AuthStatus.loading ||
-        authState.status == AuthStatus.initial;
+    final isLoading = authState.status == AuthStatus.loading;
+    final topH = MediaQuery.of(context).size.height * 0.43;
 
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 24),
+      backgroundColor: _kSage,
+      resizeToAvoidBottomInset: true,
+      body: Column(
+        children: [
+          // ── Top sage green section ──────────────────────────────────────
+          SizedBox(
+            height: topH,
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Welcome to',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white.withValues(alpha: 0.85),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'EngageBot',
+                    style: GoogleFonts.pacifico(
+                      fontSize: 40,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const RobotMascot(color: Colors.white, size: 100),
+                ],
+              ),
+            ),
+          ),
 
-              // ── Branding ──────────────────────────────────────────────────
-              Center(
-                child: Column(
-                  children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGreen,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primaryGreen.withValues(alpha: 0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.smart_toy_outlined,
-                        color: Colors.white,
-                        size: 36,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'EngageBot',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        color: context.colorOnCard,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Smart Classroom System',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: context.colorSubtle,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const SageChip(label: 'Teacher Portal'),
-                  ],
+          // ── White card section ─────────────────────────────────────────
+          Expanded(
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(28),
+                  topRight: Radius.circular(28),
                 ),
               ),
-
-              const SizedBox(height: 40),
-
-              // ── Sign-in card ───────────────────────────────────────────────
-              AppCard(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
+                    const Text(
                       'Sign In',
                       style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: context.colorOnCard,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: _kTitleColor,
+                        letterSpacing: -0.5,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Access your teacher dashboard.',
-                      style: TextStyle(fontSize: 14, color: context.colorSubtle),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black.withValues(alpha: 0.45),
+                      ),
                     ),
                     const SizedBox(height: 24),
 
-                    // ── Google button ────────────────────────────────────────
+                    // ── Google button ──────────────────────────────────────
                     _GoogleSignInButton(
                       isLoading: isLoading,
                       onTap: () =>
@@ -116,25 +111,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
 
                     const SizedBox(height: 20),
-                    const _Divider(label: 'or sign in with email'),
+                    const _OrDivider(),
                     const SizedBox(height: 20),
 
-                    // ── Email field ──────────────────────────────────────────
-                    _InputField(
+                    // ── Email field ────────────────────────────────────────
+                    _PillInputField(
                       controller: _emailCtrl,
                       label: 'Email',
-                      hint: 'teacher@school.edu.my',
                       icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
                       enabled: !isLoading,
                     ),
                     const SizedBox(height: 12),
 
-                    // ── Password field ───────────────────────────────────────
-                    _InputField(
+                    // ── Password field ─────────────────────────────────────
+                    _PillInputField(
                       controller: _passwordCtrl,
                       label: 'Password',
-                      hint: '••••••••',
                       icon: Icons.lock_outline,
                       obscure: !_showPassword,
                       enabled: !isLoading,
@@ -144,17 +137,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ? Icons.visibility_off_outlined
                               : Icons.visibility_outlined,
                           size: 20,
-                          color: context.colorSubtle,
+                          color: Colors.black.withValues(alpha: 0.4),
                         ),
                         onPressed: () =>
                             setState(() => _showPassword = !_showPassword),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
-                    // ── Email sign-in button ─────────────────────────────────
+                    // ── Sign In button ─────────────────────────────────────
                     SizedBox(
-                      height: 50,
+                      height: 54,
                       child: FilledButton(
                         onPressed: isLoading
                             ? null
@@ -165,29 +158,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   _passwordCtrl.text,
                                 ),
                         style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primaryGreen,
+                          backgroundColor: _kSage,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14)),
+                          disabledBackgroundColor:
+                              _kSage.withValues(alpha: 0.5),
+                          shape: const StadiumBorder(),
+                          elevation: 0,
                         ),
                         child: isLoading
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: Colors.white),
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
                               )
                             : const Text(
                                 'Sign In',
                                 style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                       ),
                     ),
 
-                    // ── Status banners ───────────────────────────────────────
+                    // ── Status banners ─────────────────────────────────────
                     if (authState.status == AuthStatus.notRegistered) ...[
                       const SizedBox(height: 16),
                       const _StatusBanner(
@@ -209,23 +206,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ],
                 ),
               ),
-
-              const SizedBox(height: 28),
-
-              // ── Footer ─────────────────────────────────────────────────────
-              const Center(
-                child: Text(
-                  'ENGAGEBOT V2.4.0 — FOR EDUCATORS',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textMuted,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -244,31 +227,31 @@ class _GoogleSignInButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 50,
+      height: 54,
       child: OutlinedButton(
         onPressed: isLoading ? null : onTap,
         style: OutlinedButton.styleFrom(
-          side: BorderSide(color: context.colorBorder, width: 1.5),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14)),
-          backgroundColor: context.colorBg,
-          foregroundColor: context.colorOnCard,
+          side: const BorderSide(color: Color(0xFFD8E6CE), width: 1.5),
+          shape: const StadiumBorder(),
+          backgroundColor: const Color(0xFFF6FAF3),
+          foregroundColor: _kTitleColor,
+          elevation: 0,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox(
-              width: 20,
-              height: 20,
+              width: 24,
+              height: 24,
               child: CustomPaint(painter: _GPainter()),
             ),
             const SizedBox(width: 12),
-            Text(
+            const Text(
               'Continue with Google',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: context.colorOnCard,
+                color: _kTitleColor,
               ),
             ),
           ],
@@ -278,30 +261,22 @@ class _GoogleSignInButton extends StatelessWidget {
   }
 }
 
-// Simple 4-quadrant Google "G" icon painted without any assets.
+// Simple 4-quadrant Google "G" painted without assets.
 class _GPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final r = size.width / 2;
-    final colors = [
-      const Color(0xFF4285F4),
-      const Color(0xFFEA4335),
-      const Color(0xFFFBBC05),
-      const Color(0xFF34A853),
+    final paints = [
+      Paint()..color = const Color(0xFF4285F4)..style = PaintingStyle.fill,
+      Paint()..color = const Color(0xFFEA4335)..style = PaintingStyle.fill,
+      Paint()..color = const Color(0xFFFBBC05)..style = PaintingStyle.fill,
+      Paint()..color = const Color(0xFF34A853)..style = PaintingStyle.fill,
     ];
-    final paints = colors
-        .map((c) => Paint()
-          ..color = c
-          ..style = PaintingStyle.fill)
-        .toList();
-    canvas.drawArc(Rect.fromCircle(center: Offset(r, r), radius: r),
-        3.14, 1.57, true, paints[1]);
-    canvas.drawArc(Rect.fromCircle(center: Offset(r, r), radius: r),
-        4.71, 1.57, true, paints[0]);
-    canvas.drawArc(Rect.fromCircle(center: Offset(r, r), radius: r),
-        0, 1.57, true, paints[3]);
-    canvas.drawArc(Rect.fromCircle(center: Offset(r, r), radius: r),
-        1.57, 1.57, true, paints[2]);
+    final c = Offset(r, r);
+    canvas.drawArc(Rect.fromCircle(center: c, radius: r), 3.14, 1.57, true, paints[1]);
+    canvas.drawArc(Rect.fromCircle(center: c, radius: r), 4.71, 1.57, true, paints[0]);
+    canvas.drawArc(Rect.fromCircle(center: c, radius: r), 0.00, 1.57, true, paints[3]);
+    canvas.drawArc(Rect.fromCircle(center: c, radius: r), 1.57, 1.57, true, paints[2]);
   }
 
   @override
@@ -309,49 +284,47 @@ class _GPainter extends CustomPainter {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Divider with centred label
+// "or sign in with email" divider
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _Divider extends StatelessWidget {
-  final String label;
-  const _Divider({required this.label});
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: Divider(color: context.colorBorder)),
+        const Expanded(child: Divider(color: Color(0xFFE2EDD9))),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Text(
-            label,
-            style: TextStyle(fontSize: 12, color: context.colorMuted),
+            'or sign in with email',
+            style: TextStyle(
+                fontSize: 12, color: Colors.black.withValues(alpha: 0.38)),
           ),
         ),
-        Expanded(child: Divider(color: context.colorBorder)),
+        const Expanded(child: Divider(color: Color(0xFFE2EDD9))),
       ],
     );
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Reusable input field
+// Pill-shaped input field
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _InputField extends StatelessWidget {
+class _PillInputField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
-  final String hint;
   final IconData icon;
   final bool obscure;
   final bool enabled;
   final TextInputType keyboardType;
   final Widget? suffix;
 
-  const _InputField({
+  const _PillInputField({
     required this.controller,
     required this.label,
-    required this.hint,
     required this.icon,
     this.obscure = false,
     this.enabled = true,
@@ -366,31 +339,34 @@ class _InputField extends StatelessWidget {
       obscureText: obscure,
       enabled: enabled,
       keyboardType: keyboardType,
-      style: TextStyle(fontSize: 14, color: context.colorOnCard),
+      style: const TextStyle(fontSize: 14, color: _kTitleColor),
       decoration: InputDecoration(
         labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon, size: 20, color: context.colorSubtle),
+        prefixIcon:
+            Icon(icon, size: 20, color: Colors.black.withValues(alpha: 0.38)),
         suffixIcon: suffix,
         filled: true,
-        fillColor: context.colorInputFill,
-        labelStyle: TextStyle(color: context.colorSubtle, fontSize: 13),
-        hintStyle: TextStyle(color: context.colorMuted, fontSize: 13),
+        fillColor: const Color(0xFFF0F4ED),
+        labelStyle: TextStyle(
+            color: Colors.black.withValues(alpha: 0.42), fontSize: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(50),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: context.colorBorder),
+          borderRadius: BorderRadius.circular(50),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: AppColors.primaryGreen, width: 1.5),
+          borderRadius: BorderRadius.circular(50),
+          borderSide: const BorderSide(color: _kSage, width: 1.5),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50),
+          borderSide: BorderSide.none,
         ),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       ),
     );
   }
@@ -417,7 +393,7 @@ class _StatusBanner extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
@@ -428,8 +404,8 @@ class _StatusBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(
-                  fontSize: 13, color: context.colorOnCard, height: 1.5),
+              style: const TextStyle(
+                  fontSize: 13, color: _kTitleColor, height: 1.5),
             ),
           ),
         ],

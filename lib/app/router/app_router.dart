@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../features/auth/splash_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/classes/classes_screen.dart';
@@ -13,6 +14,7 @@ import '../../shared/widgets/engagebot_scaffold.dart';
 
 /// Named route constants — use these everywhere instead of raw strings.
 abstract final class AppRoutes {
+  static const splash = '/splash';
   static const login = '/login';
   static const dashboard = '/dashboard';
   static const classes = '/classes';
@@ -25,27 +27,51 @@ abstract final class AppRoutes {
 /// Builds and returns the GoRouter for the app.
 GoRouter buildAppRouter() {
   return GoRouter(
-    initialLocation: AppRoutes.login,
+    initialLocation: AppRoutes.splash,
 
     // Re-evaluate redirect whenever Firebase auth state changes.
     refreshListenable: _AuthStateNotifier(),
 
     // Auth guard: redirect unauthenticated users to /login,
     // and skip /login for already-authenticated users.
+    // /splash is exempt — it reads auth state itself and navigates when ready.
     redirect: (context, state) {
+      final loc = state.matchedLocation;
+      if (loc == AppRoutes.splash) return null;
       final isLoggedIn = FirebaseAuth.instance.currentUser != null;
-      final onLogin = state.matchedLocation == AppRoutes.login;
-      if (!isLoggedIn && !onLogin) return AppRoutes.login;
-      if (isLoggedIn && onLogin) return AppRoutes.dashboard;
+      if (!isLoggedIn && loc != AppRoutes.login) return AppRoutes.login;
+      if (isLoggedIn && loc == AppRoutes.login) return AppRoutes.dashboard;
       return null;
     },
 
     routes: [
+      // ── Splash — shown once on app launch ──────────────────────────────
+      GoRoute(
+        path: AppRoutes.splash,
+        name: 'splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+
       // ── Auth — standalone, no shell ────────────────────────────────────
+      // Slides up from the bottom when navigated from splash.
       GoRoute(
         path: AppRoutes.login,
         name: 'login',
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage<void>(
+          key: state.pageKey,
+          child: const LoginScreen(),
+          transitionDuration: const Duration(milliseconds: 600),
+          reverseTransitionDuration: const Duration(milliseconds: 400),
+          transitionsBuilder: (context, animation, _, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeInOut,
+              ),
+              child: child,
+            );
+          },
+        ),
       ),
 
       // ── Class Analytics — no bottom nav ────────────────────────────────
