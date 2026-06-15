@@ -8,6 +8,7 @@ class LiveSessionCard extends StatelessWidget {
   final String trend;
   final int sessionMinutes;
   final String droidStatus;
+  final String period;
 
   const LiveSessionCard({
     super.key,
@@ -15,6 +16,7 @@ class LiveSessionCard extends StatelessWidget {
     required this.trend,
     required this.sessionMinutes,
     required this.droidStatus,
+    required this.period,
   });
 
   @override
@@ -79,17 +81,22 @@ class LiveSessionCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
-                // Pill chips row
-                Row(
+                // Pill chips row — Wrap prevents overflow on narrow screens
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
                     _PillChip(
                       icon: Icons.timer_outlined,
                       label: '${sessionMinutes}m',
                     ),
-                    const SizedBox(width: 8),
                     _PillChip(
                       icon: Icons.trending_up,
                       label: trend,
+                    ),
+                    _PillChip(
+                      icon: Icons.schedule_rounded,
+                      label: period,
                     ),
                   ],
                 ),

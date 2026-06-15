@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
-import '../../app/router/app_router.dart';
 import '../../data/mock/mock_data_service.dart';
+import '../auth/providers/auth_provider.dart';
 import 'providers/settings_provider.dart';
 import 'widgets/droid_illustration_painter.dart';
 
@@ -225,7 +224,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              context.go(AppRoutes.login);
+              ref.read(authProvider.notifier).signOut();
+              // GoRouter redirect handles navigation to /login automatically.
             },
             style: TextButton.styleFrom(
                 foregroundColor: AppColors.liveRed),

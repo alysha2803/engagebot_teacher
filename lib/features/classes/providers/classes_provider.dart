@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/mock/mock_data_service.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
+import '../../../data/services/firebase_data_service.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,23 +116,69 @@ class ClassesNotifier extends StateNotifier<ClassesState> {
 
   ClassesNotifier(this._ref)
       : super(ClassesState(
-          classes: MockDataService.getClasses(),
+          classes: MockDataService.getClassesForTeacher(
+              _ref.read(currentTeacherIdProvider) ?? ''),
           allStudents: [],
         )) {
-    // Build initial student list
+    // Build initial student list from mock immediately (no wait).
     state = state.copyWith(allStudents: _buildAllStudents());
 
-    // Keep the student list in sync whenever a name/status is edited from
-    // the Dashboard (both screens share studentEditsProvider).
+    // Re-initialise when the teacher signs in or changes account.
+    _ref.listen<String?>(currentTeacherIdProvider, (_, next) {
+      final teacherId = next ?? '';
+      state = state.copyWith(
+        classes: MockDataService.getClassesForTeacher(teacherId),
+        allStudents: _buildAllStudents(teacherId: teacherId),
+      );
+      if (teacherId.isNotEmpty) refreshFromFirebase(teacherId);
+    });
+
+    // Keep the student list in sync whenever a name/status is edited.
     _ref.listen<Map<String, StudentModel>>(
       studentEditsProvider,
       (_, __) => state = state.copyWith(allStudents: _buildAllStudents()),
     );
+
+    // Kick off a Firebase refresh if the teacher is already signed in.
+    Future.microtask(() {
+      final id = _ref.read(currentTeacherIdProvider) ?? '';
+      if (id.isNotEmpty) refreshFromFirebase(id);
+    });
   }
 
-  List<StudentWithClass> _buildAllStudents() {
+  /// Loads the real class list and full student roster from Firestore,
+  /// replacing the mock-populated initial state.
+  Future<void> refreshFromFirebase(String teacherId) async {
+    if (!mounted) return;
+    state = state.copyWith(isLoading: true);
+
+    final classes = await FirebaseDataService.getClasses(teacherId);
+    if (!mounted) return;
+
+    final allFromFirebase =
+        await FirebaseDataService.getAllStudentsForTeacher(teacherId);
+    if (!mounted) return;
+
     final edits = _ref.read(studentEditsProvider);
-    return MockDataService.getAllClassRosters()
+    final allStudents = allFromFirebase
+        .where((s) => s.classCode != null)
+        .map((s) => StudentWithClass(
+              student: edits[s.id] ?? s,
+              classCode: s.classCode!,
+            ))
+        .toList();
+
+    state = state.copyWith(
+      classes: classes,
+      allStudents: allStudents,
+      isLoading: false,
+    );
+  }
+
+  List<StudentWithClass> _buildAllStudents({String? teacherId}) {
+    final id = teacherId ?? _ref.read(currentTeacherIdProvider) ?? '';
+    final edits = _ref.read(studentEditsProvider);
+    return MockDataService.getAllClassRostersForTeacher(id)
         .expand((entry) => entry.value.map((baseStudent) => StudentWithClass(
               student: edits[baseStudent.id] ?? baseStudent,
               classCode: entry.key,

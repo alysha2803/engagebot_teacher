@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 
 abstract final class AppColors {
   // Primary
-  static const primaryGreen = Color(0xFF7A8C5E);
-  static const primaryGreenDark = Color(0xFF5C6B43);
+  static const primaryGreen = Color(0xFF9CAF88);
+  static const primaryGreenDark = Color(0xFF7A8C5E);
 
   // Backgrounds (light-mode constants — use context extension for adaptive)
   static const backgroundLight = Color(0xFFF5F5F0);

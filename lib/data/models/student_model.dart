@@ -5,6 +5,7 @@ class StudentModel {
   final String status; // 'engaged' | 'distracted' | 'flagged'
   final String? avatarUrl;
   final String? statusNote; // optional teacher note attached to a status change
+  final String? classCode;  // set when loading all students in one query
 
   const StudentModel({
     required this.id,
@@ -12,6 +13,7 @@ class StudentModel {
     required this.status,
     this.avatarUrl,
     this.statusNote,
+    this.classCode,
   });
 
   factory StudentModel.fromJson(Map<String, dynamic> json) => StudentModel(
@@ -20,6 +22,7 @@ class StudentModel {
         status: json['status'] as String,
         avatarUrl: json['avatarUrl'] as String?,
         statusNote: json['statusNote'] as String?,
+        classCode: json['classCode'] as String?,
       );
 
   StudentModel copyWith({
@@ -28,6 +31,7 @@ class StudentModel {
     String? status,
     String? avatarUrl,
     String? statusNote,
+    String? classCode,
   }) =>
       StudentModel(
         id: id ?? this.id,
@@ -35,6 +39,7 @@ class StudentModel {
         status: status ?? this.status,
         avatarUrl: avatarUrl ?? this.avatarUrl,
         statusNote: statusNote ?? this.statusNote,
+        classCode: classCode ?? this.classCode,
       );
 
   Map<String, dynamic> toJson() => {
@@ -43,6 +48,7 @@ class StudentModel {
         'status': status,
         'avatarUrl': avatarUrl,
         'statusNote': statusNote,
+        'classCode': classCode,
       };
 }
 

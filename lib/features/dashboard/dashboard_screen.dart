@@ -4,12 +4,27 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../data/mock/mock_data_service.dart';
 import '../../data/models/analytics_models.dart';
+import '../../shared/widgets/engagebot_scaffold.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import 'providers/dashboard_provider.dart';
 import 'widgets/live_session_card.dart';
 import 'widgets/class_selector_row.dart';
 import 'widgets/ai_recommendation_card.dart';
 import 'widgets/class_roster_section.dart';
+
+String _currentPeriod() {
+  final now = DateTime.now();
+  final m = now.hour * 60 + now.minute;
+  if (m >= 450 && m < 490) return 'Period 1'; // 7:30–8:10
+  if (m >= 490 && m < 530) return 'Period 2'; // 8:10–8:50
+  if (m >= 530 && m < 570) return 'Period 3'; // 8:50–9:30
+  if (m >= 570 && m < 610) return 'Period 4'; // 9:30–10:10
+  if (m >= 610 && m < 650) return 'Period 5'; // 10:10–10:50
+  if (m >= 650 && m < 690) return 'Period 6'; // 10:50–11:30
+  if (m >= 690 && m < 730) return 'Period 7'; // 11:30–12:10
+  if (m >= 730 && m < 770) return 'Period 8'; // 12:10–12:50
+  return 'Free Period';
+}
 
 /// Dashboard (Live Monitoring) — Tab 0.
 class DashboardScreen extends ConsumerWidget {
@@ -32,9 +47,10 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: const Padding(
-          padding: EdgeInsets.all(10),
-          child: AppLogo(size: 32),
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          onPressed: () =>
+              EngagebotDrawer.maybeOf(context)?.openDrawer(),
         ),
         title: const Text(
           'Live Monitoring',
@@ -43,13 +59,7 @@ class DashboardScreen extends ConsumerWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined,
-                color: AppColors.textSecondary),
-            onPressed: () {},
-          ),
-        ],
+        actions: const [],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -64,6 +74,7 @@ class DashboardScreen extends ConsumerWidget {
               trend: state.liveEngagement['trend'] as String,
               sessionMinutes: state.liveEngagement['sessionMinutes'] as int,
               droidStatus: state.liveEngagement['droidStatus'] as String,
+              period: _currentPeriod(),
             ),
 
             const SizedBox(height: 24),

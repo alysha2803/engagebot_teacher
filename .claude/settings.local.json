@@ -4,7 +4,17 @@
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Alysha\\\\Downloads\\\\engagebot_teacher\" -Recurse)",
       "Bash(Select-Object FullName)",
       "Bash(Sort-Object FullName)",
-      "Bash(dart analyze *)"
+      "Bash(dart analyze *)",
+      "Bash(flutter pub *)",
+      "Bash(flutter analyze *)",
+      "Bash(flutter build *)",
+      "Bash(Read \"C:\\\\Users\\\\Alysha\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Alysha-Downloads-engagebot-teacher\\\\4d31f41a-107c-4f76-b537-2655025961be\\\\tasks\\\\bfogkopyz.output\")",
+      "PowerShell(Get-PSDrive C | Select-Object Used, Free | ForEach-Object { \"Used: {0:N1} GB  Free: {1:N1} GB\" -f \\($_.Used/1GB\\), \\($_.Free/1GB\\) })",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.gradle\\\\caches\" -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum | ForEach-Object { \"Gradle cache size: {0:N1} GB\" -f \\($_.Sum/1GB\\) }; \\(Get-ChildItem \"$env:USERPROFILE\\\\.gradle\\\\caches\" -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum\\).Sum / 1GB | ForEach-Object { \"Total: {0:N1} GB\" -f $_ })",
+      "Bash(New-Item -ItemType Directory -Force \"c:\\\\Users\\\\Alysha\\\\Downloads\\\\engagebot_teacher\\\\assets\\\\images\")",
+      "Bash(Out-Null)",
+      "Bash(Write-Output \"Directory created\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\Users\\\\Alysha\\\\Downloads\\\\engagebot_teacher\\\\assets\\\\images\")"
     ]
   }
 }

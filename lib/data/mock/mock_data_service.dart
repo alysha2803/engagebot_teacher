@@ -38,18 +38,31 @@ abstract final class MockDataService {
   // Class list
   // ---------------------------------------------------------------------------
 
-  static List<ClassModel> getClasses() => [
-        ClassModel.fromJson(
-            {'code': '1 USAHA', 'subject': 'Mathematics', 'students': 28, 'status': 'online'}),
-        ClassModel.fromJson(
-            {'code': '2 JUJUR', 'subject': 'Mathematics', 'students': 30, 'status': 'online'}),
-        ClassModel.fromJson(
-            {'code': '3 TEKUN', 'subject': 'Mathematics', 'students': 32, 'status': 'online'}),
-        ClassModel.fromJson(
-            {'code': '4 GIGIH', 'subject': 'Add Maths', 'students': 24, 'status': 'offline'}),
-        ClassModel.fromJson(
-            {'code': '5 CEKAL', 'subject': 'Add Maths', 'students': 30, 'status': 'online'}),
-      ];
+  static const _kSarahId  = 'teacher_sarah_halim';
+  static const _kRahmanId = 'teacher_rahman_aziz';
+
+  static final Map<String, List<ClassModel>> _classesByTeacher = {
+    _kSarahId: [
+      ClassModel.fromJson({'code': '1 USAHA', 'subject': 'Mathematics', 'students': 28, 'status': 'online'}),
+      ClassModel.fromJson({'code': '2 JUJUR', 'subject': 'Mathematics', 'students': 30, 'status': 'online'}),
+      ClassModel.fromJson({'code': '3 TEKUN', 'subject': 'Mathematics', 'students': 32, 'status': 'online'}),
+      ClassModel.fromJson({'code': '4 GIGIH', 'subject': 'Add Maths',   'students': 24, 'status': 'offline'}),
+      ClassModel.fromJson({'code': '5 CEKAL', 'subject': 'Add Maths',   'students': 30, 'status': 'online'}),
+    ],
+    _kRahmanId: [
+      ClassModel.fromJson({'code': '4 ALFA',  'subject': 'Science',  'students': 26, 'status': 'online'}),
+      ClassModel.fromJson({'code': '4 BETA',  'subject': 'Science',  'students': 28, 'status': 'offline'}),
+      ClassModel.fromJson({'code': '5 SAINS', 'subject': 'Biology',  'students': 22, 'status': 'online'}),
+    ],
+  };
+
+  /// Returns classes for the given teacher ID (falls back to Sarah's classes
+  /// for unknown IDs so the UI always has data).
+  static List<ClassModel> getClassesForTeacher(String teacherId) =>
+      _classesByTeacher[teacherId] ?? _classesByTeacher[_kSarahId]!;
+
+  /// Legacy no-arg accessor — kept for call sites that don't have a teacher ID.
+  static List<ClassModel> getClasses() => _classesByTeacher[_kSarahId]!;
 
   // ---------------------------------------------------------------------------
   // Per-class rosters
@@ -57,64 +70,122 @@ abstract final class MockDataService {
 
   static final Map<String, List<Map<String, dynamic>>> _classRosterData = {
     '1 USAHA': [
-      {'id': 'ahmad', 'name': 'Ahmad', 'status': 'engaged'},
-      {'id': 'aina', 'name': 'Aina', 'status': 'engaged'},
-      {'id': 'hamid', 'name': 'Hamid', 'status': 'engaged'},
-      {'id': 'maya', 'name': 'Maya', 'status': 'distracted'},
-      {'id': 'badrul', 'name': 'Badrul', 'status': 'engaged'},
-      {'id': 'hani', 'name': 'Hani', 'status': 'engaged'},
+      {'id': 'stu_ahmad',  'name': 'Ahmad Firdaus',       'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_aina',   'name': 'Aina Syahira',        'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_hamid',  'name': 'Hamid Roslan',        'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_maya',   'name': 'Maya Delisha',        'status': 'distracted', 'statusNote': 'Often distracted near the window'},
+      {'id': 'stu_badrul', 'name': 'Badrul Hisham',       'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_hani',   'name': 'Hani Aisyah',         'status': 'engaged',    'statusNote': ''},
     ],
     '2 JUJUR': [
-      {'id': 'haziq', 'name': 'Haziq', 'status': 'engaged'},
-      {'id': 'aishah', 'name': 'Aishah', 'status': 'distracted'},
-      {'id': 'rahman', 'name': 'Rahman', 'status': 'engaged'},
-      {'id': 'suria', 'name': 'Suria', 'status': 'flagged'},
-      {'id': 'jeffri', 'name': 'Jeffri', 'status': 'engaged'},
-      {'id': 'nadia', 'name': 'Nadia', 'status': 'engaged'},
+      {'id': 'stu_haziq',    'name': 'Haziq Iqmal',       'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_aishah',   'name': 'Aishah Nabilah',    'status': 'distracted', 'statusNote': ''},
+      {'id': 'stu_rahman_s', 'name': 'Rahman Kamal',      'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_suria',    'name': 'Suria Binti Azlan', 'status': 'flagged',    'statusNote': 'Needs 1-on-1 attention'},
+      {'id': 'stu_jeffri',   'name': 'Jeffri Azwan',      'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_nadia',    'name': 'Nadia Farhan',      'status': 'engaged',    'statusNote': ''},
     ],
     '3 TEKUN': [
-      {'id': 'ali_zain', 'name': 'Ali Zain', 'status': 'engaged'},
-      {'id': 'sarah_m', 'name': 'Sarah', 'status': 'engaged'},
-      {'id': 'amir_k', 'name': 'Amir', 'status': 'distracted'},
-      {'id': 'fatimah_bt', 'name': 'Fatimah', 'status': 'engaged'},
-      {'id': 'hafiz_r', 'name': 'Hafiz', 'status': 'engaged'},
-      {'id': 'nurul_f', 'name': 'Nurul', 'status': 'engaged'},
+      {'id': 'stu_ali_zain', 'name': 'Ali Zain',              'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_sarah_m',  'name': 'Sarah Marsya',          'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_amir_k',   'name': 'Amir Khairul',          'status': 'distracted', 'statusNote': ''},
+      {'id': 'stu_fatimah',  'name': 'Fatimah Binti Hamdan',  'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_hafiz_r',  'name': 'Hafiz Ridzuan',         'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_nurul_f',  'name': 'Nurul Farhana',         'status': 'engaged',    'statusNote': ''},
     ],
     '4 GIGIH': [
-      {'id': 'farid', 'name': 'Farid', 'status': 'engaged'},
-      {'id': 'lina', 'name': 'Lina', 'status': 'engaged'},
-      {'id': 'karim', 'name': 'Karim', 'status': 'distracted'},
-      {'id': 'zara', 'name': 'Zara', 'status': 'engaged'},
-      {'id': 'dani', 'name': 'Dani', 'status': 'flagged'},
-      {'id': 'sofea', 'name': 'Sofea', 'status': 'engaged'},
+      {'id': 'stu_farid', 'name': 'Farid Asyraf',    'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_lina',  'name': 'Lina Azura',      'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_karim', 'name': 'Karim Imran',     'status': 'distracted', 'statusNote': ''},
+      {'id': 'stu_zara',  'name': 'Zara Batrisyia',  'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_dani',  'name': 'Dani Hafeez',     'status': 'flagged',    'statusNote': 'Persistent off-task behaviour'},
+      {'id': 'stu_sofea', 'name': 'Sofea Insyirah',  'status': 'engaged',    'statusNote': ''},
     ],
     '5 CEKAL': [
-      {'id': 'azri', 'name': 'Azri', 'status': 'engaged'},
-      {'id': 'izzati', 'name': 'Izzati', 'status': 'engaged'},
-      {'id': 'ridzuan', 'name': 'Ridzuan', 'status': 'distracted'},
-      {'id': 'farhana', 'name': 'Farhana', 'status': 'engaged'},
-      {'id': 'lutfi', 'name': 'Lutfi', 'status': 'engaged'},
-      {'id': 'shira', 'name': 'Shira', 'status': 'engaged'},
+      {'id': 'stu_azri',    'name': 'Azri Hakimi',     'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_izzati',  'name': 'Izzati Najwa',    'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_ridzuan', 'name': 'Ridzuan Hanafi',  'status': 'distracted', 'statusNote': ''},
+      {'id': 'stu_farhana', 'name': 'Farhana Qistina', 'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_lutfi',   'name': 'Lutfi Hakim',     'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_shira',   'name': 'Shira Balqis',    'status': 'engaged',    'statusNote': ''},
+    ],
+    // ── Rahman Aziz — Science / Biology ──────────────────────────────────────
+    '4 ALFA': [
+      {'id': 'stu_r_amirul', 'name': 'Amirul Aqif',   'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_r_balkis', 'name': 'Balkis Nadia',   'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_r_cheng',  'name': 'Cheng Wei Lun',  'status': 'distracted', 'statusNote': ''},
+      {'id': 'stu_r_dalila', 'name': 'Dalila Hanum',   'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_r_emir',   'name': 'Emir Zulhilmi',  'status': 'flagged',    'statusNote': 'Struggling with new syllabus'},
+      {'id': 'stu_r_fatin',  'name': 'Fatin Husna',    'status': 'engaged',    'statusNote': ''},
+    ],
+    '4 BETA': [
+      {'id': 'stu_r_ghazi',  'name': 'Ghazi Ariffin',  'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_r_hawa',   'name': 'Hawa Maisarah',  'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_r_irfan',  'name': 'Irfan Zulkifli', 'status': 'distracted', 'statusNote': ''},
+      {'id': 'stu_r_jannah', 'name': 'Jannah Rashidah','status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_r_khalis', 'name': 'Khalis Aiman',   'status': 'engaged',    'statusNote': ''},
+    ],
+    '5 SAINS': [
+      {'id': 'stu_r_laila',  'name': 'Laila Hazwani',  'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_r_musa',   'name': 'Musa Aminuddin', 'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_r_naim',   'name': 'Naim Fauzan',    'status': 'distracted', 'statusNote': ''},
+      {'id': 'stu_r_orked',  'name': 'Orked Syafiqa',  'status': 'engaged',    'statusNote': ''},
+      {'id': 'stu_r_puteri', 'name': 'Puteri Alya',    'status': 'engaged',    'statusNote': ''},
     ],
   };
 
+  // Maps each teacher to the class codes they own — used to scope roster lookups.
+  static const Map<String, List<String>> _teacherClassCodes = {
+    _kSarahId:  ['1 USAHA', '2 JUJUR', '3 TEKUN', '4 GIGIH', '5 CEKAL'],
+    _kRahmanId: ['4 ALFA', '4 BETA', '5 SAINS'],
+  };
+
   // TODO: Replace with droid live roster API
-  static List<StudentModel> getRoster() =>
-      getRosterForClass('1 USAHA');
+  static List<StudentModel> getRoster() => getRosterForClass('1 USAHA');
 
   static List<StudentModel> getRosterForClass(String classCode) {
     final data = _classRosterData[classCode] ?? _classRosterData['1 USAHA']!;
     return data.map((d) => StudentModel.fromJson(d)).toList();
   }
 
+  /// Teacher-aware roster lookup — used as Firebase fallback so each account
+  /// only sees its own students even when offline.
+  static List<StudentModel> getRosterForClassByTeacher(
+      String classCode, String teacherId) {
+    // Verify the class belongs to this teacher before returning its roster.
+    final codes = _teacherClassCodes[teacherId] ?? _teacherClassCodes[_kSarahId]!;
+    final resolvedCode = codes.contains(classCode) ? classCode : codes.first;
+    return getRosterForClass(resolvedCode);
+  }
+
+  /// Returns every class alongside its base roster for a given teacher.
+  static List<MapEntry<String, List<StudentModel>>> getAllClassRostersForTeacher(
+      String teacherId) {
+    final codes = _teacherClassCodes[teacherId] ?? _teacherClassCodes[_kSarahId]!;
+    return codes
+        .where((c) => _classRosterData.containsKey(c))
+        .map((c) => MapEntry(
+              c,
+              _classRosterData[c]!.map((d) => StudentModel.fromJson(d)).toList(),
+            ))
+        .toList();
+  }
+
   /// Returns every class alongside its base roster — used by the Students tab.
   static List<MapEntry<String, List<StudentModel>>> getAllClassRosters() =>
-      _classRosterData.entries
-          .map((e) => MapEntry(
-                e.key,
-                e.value.map((d) => StudentModel.fromJson(d)).toList(),
-              ))
-          .toList();
+      getAllClassRostersForTeacher(_kSarahId);
+
+  /// Returns all students for a teacher as a flat list, each with `classCode`
+  /// set — mirrors what FirebaseDataService.getAllStudentsForTeacher returns.
+  static List<StudentModel> getAllStudentsWithClassForTeacher(
+      String teacherId) {
+    final codes = _teacherClassCodes[teacherId] ?? _teacherClassCodes[_kSarahId]!;
+    return codes
+        .where(_classRosterData.containsKey)
+        .expand((code) => _classRosterData[code]!.map(
+            (d) => StudentModel.fromJson({...d, 'classCode': code})))
+        .toList();
+  }
 
   // ---------------------------------------------------------------------------
   // Student profile
