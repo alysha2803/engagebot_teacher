@@ -43,3 +43,40 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase & Google Services — NEVER commit these
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+
+# Service account keys & secrets — NEVER commit these
+service-account.json
+*-service-account.json
+*.serviceAccount.json
+*.key.json
+.env
+.env.*
+secrets/
+keys/
+
+# Android build artifacts
+android/app/.cxx/
+android/.gradle/
+android/local.properties
+android/key.properties
+*.jks
+*.keystore
+
+# iOS build artifacts
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Node / scripts
+scripts/node_modules/
+node_modules/
+
+# Claude Code local settings (contains project-specific config)
+.claude/settings.local.json
