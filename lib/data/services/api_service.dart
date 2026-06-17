@@ -101,7 +101,15 @@ class ApiService {
       '/reports',
       queryParameters: {'date': date},
     );
-    return res.data!;
+    return res.data ?? [];
+  }
+
+  static Future<Map<String, dynamic>> getMonthlyReports(int month, int year) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '/reports/monthly',
+      queryParameters: {'month': month, 'year': year},
+    );
+    return res.data ?? {};
   }
 
   // ── Generic GET helper ───────────────────────────────────────────────────────

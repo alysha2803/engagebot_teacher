@@ -83,7 +83,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
     return baseRoster.map((s) => edits[s.id] ?? s).toList();
   }
 
-  /// Pull classes and current roster from Firestore (falls back to mock data).
+  /// Pull classes, roster, and live session data from the API.
   Future<void> refreshFromFirebase(String teacherId) async {
     if (!mounted) return;
     state = state.copyWith(isLoading: true);
@@ -91,28 +91,72 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
     final classes = await FirebaseDataService.getClasses(teacherId);
     if (!mounted) return;
 
-    final classCode =
-        classes.isNotEmpty ? classes[0].code : '1 USAHA';
-    final roster =
-        await FirebaseDataService.getRosterForClass(classCode, teacherId);
+    final classCode = classes.isNotEmpty ? classes[0].code : '';
+
+    // Fetch roster (with droid engagement overlay) and live session in parallel.
+    final rosterFuture =
+        FirebaseDataService.getRosterWithEngagement(classCode, teacherId);
+    final liveFuture = FirebaseDataService.getLiveSession(classCode);
+
+    final roster = await rosterFuture;
+    final liveSession = await liveFuture;
     if (!mounted) return;
 
     state = state.copyWith(
       classes: classes,
       roster: _applyEdits(roster),
       selectedClassIndex: 0,
+      liveEngagement:
+          liveSession != null ? _mapLiveSession(liveSession) : state.liveEngagement,
       isLoading: false,
     );
   }
 
-  /// Switch to a different class. Uses Firestore roster when a teacher is
-  /// signed in, otherwise falls back to mock data.
+  static Map<String, dynamic> _mapLiveSession(Map<String, dynamic> report) {
+    final score = (report['avgFocusScore'] as num?)?.toInt() ?? 0;
+    final engagement = (report['overallEngagement'] as String?) ?? '';
+    final startTime = report['startTime'] as String?;
+
+    int minutes = 0;
+    if (startTime != null) {
+      final parts = startTime.split(':');
+      if (parts.length >= 2) {
+        final h = int.tryParse(parts[0]) ?? 0;
+        final m = int.tryParse(parts[1]) ?? 0;
+        final now = DateTime.now();
+        final startMinutes = h * 60 + m;
+        final nowMinutes = now.hour * 60 + now.minute;
+        minutes = (nowMinutes - startMinutes).clamp(0, 200);
+      }
+    }
+
+    // Simple trend label derived from score.
+    final diff = score - 70;
+    final trend = diff >= 0 ? '+$diff%' : '$diff%';
+
+    final droidStatus = switch (engagement) {
+      'high' => 'ENGAGED',
+      'medium' => 'MODERATE',
+      'low' => 'DISTRACTED',
+      'absent' => 'ABSENT',
+      _ => report['status'] == 'in_progress' ? 'MONITORING' : 'IDLE',
+    };
+
+    return {
+      'percentage': score,
+      'trend': trend,
+      'sessionMinutes': minutes,
+      'droidStatus': droidStatus,
+    };
+  }
+
+  /// Switch to a different class and reload its roster with droid engagement.
   Future<void> selectClass(int index) async {
     final classCode = state.classes[index].code;
     final teacherId = _ref.read(currentTeacherIdProvider) ?? '';
 
     final baseRoster = teacherId.isNotEmpty
-        ? await FirebaseDataService.getRosterForClass(classCode, teacherId)
+        ? await FirebaseDataService.getRosterWithEngagement(classCode, teacherId)
         : MockDataService.getRosterForClass(classCode);
 
     if (!mounted) return;

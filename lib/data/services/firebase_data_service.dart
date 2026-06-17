@@ -45,21 +45,19 @@ abstract final class FirebaseDataService {
 
   // ── Class list ─────────────────────────────────────────────────────────────
 
-  // The API returns ClassSchedule records. We group them into ClassModel
-  // by classGroup name so the existing UI keeps working unchanged.
   static Future<List<ClassModel>> getClasses(String teacherId) =>
       _withFallback(
         () async {
+          // Empty teacherId means no auth — use mock so dev mode still works.
           if (teacherId.isEmpty) return null;
           final raw = await ApiService.getSchedules(teacherId: teacherId);
-          if (raw.isEmpty) return null;
 
           // Deduplicate: one ClassModel per unique classGroup.
           final seen = <String>{};
           final classes = <ClassModel>[];
           for (final s in raw) {
             final code = s['classGroup'] as String? ?? '';
-            if (seen.contains(code)) continue;
+            if (code.isEmpty || seen.contains(code)) continue;
             seen.add(code);
             classes.add(ClassModel.fromJson({
               'code': code,
@@ -69,6 +67,7 @@ abstract final class FirebaseDataService {
             }));
           }
           classes.sort((a, b) => a.code.compareTo(b.code));
+          // Return the list even if empty — shows "no classes" instead of mock.
           return classes;
         },
         () => MockDataService.getClassesForTeacher(teacherId),
@@ -97,13 +96,12 @@ abstract final class FirebaseDataService {
       _withFallback(
         () async {
           if (teacherId.isEmpty) return null;
-          // Get all classes for this teacher, then fetch students per class.
           final schedules = await ApiService.getSchedules(teacherId: teacherId);
           final classCodes = schedules
               .map((s) => s['classGroup'] as String?)
               .whereType<String>()
               .toSet();
-          if (classCodes.isEmpty) return null;
+          if (classCodes.isEmpty) return [];
 
           final students = <StudentModel>[];
           for (final code in classCodes) {
@@ -116,7 +114,7 @@ abstract final class FirebaseDataService {
                   'classCode': d['classGroup'] ?? code,
                 })));
           }
-          return students.isEmpty ? null : students;
+          return students; // empty list = no students in DB yet
         },
         () => MockDataService.getAllStudentsWithClassForTeacher(teacherId),
       );
@@ -130,15 +128,103 @@ abstract final class FirebaseDataService {
       _withFallback(
         () async {
           if (teacherId.isEmpty) return null;
+          if (classCode.isEmpty) return [];
           final raw = await ApiService.getStudents(classGroup: classCode);
-          if (raw.isEmpty) return null;
           return raw.map((d) => StudentModel.fromJson({
                 'id': (d['id'] ?? d['_id'] ?? '').toString(),
                 'name': d['name'] ?? '',
-                'status': d['status'] ?? 'engaged',
+                'status': _mapEngagementLevel(d['engagementLevel'] as String?),
                 'statusNote': d['statusNote'],
               })).toList();
+          // Returns empty list if no students — no mock fallback.
         },
         () => MockDataService.getRosterForClassByTeacher(classCode, teacherId),
       );
+
+  // ── Live session (droid data) ──────────────────────────────────────────────
+
+  // Returns the active or most recent session report for today.
+  // Returns null when no droid has reported yet (UI keeps mock placeholder).
+  static Future<Map<String, dynamic>?> getLiveSession(String classGroup) async {
+    try {
+      final now = DateTime.now();
+      final date =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final reports = await ApiService.getSessionReports(date);
+      if (reports.isEmpty) return null;
+
+      // Prefer an in-progress session for this class; fall back to latest.
+      final forClass = classGroup.isEmpty
+          ? reports
+          : reports
+              .where((r) => (r['classGroup'] as String?) == classGroup)
+              .toList();
+
+      if (forClass.isEmpty) return null;
+
+      final inProgress = forClass
+          .where((r) => (r['status'] as String?) == 'in_progress')
+          .toList();
+      return (inProgress.isNotEmpty ? inProgress.last : forClass.last)
+          as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ── Per-student engagement from session report ─────────────────────────────
+
+  // Overlays droid engagement levels onto a roster fetched from the students API.
+  static Future<List<StudentModel>> getRosterWithEngagement(
+    String classCode,
+    String teacherId,
+  ) async {
+    final roster = await getRosterForClass(classCode, teacherId);
+    if (roster.isEmpty) return roster;
+
+    try {
+      final now = DateTime.now();
+      final date =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final reports = await ApiService.getSessionReports(date);
+      final sessionReport = reports
+          .where((r) =>
+              (r['classGroup'] as String?) == classCode &&
+              (r['status'] as String?) == 'in_progress')
+          .lastOrNull as Map<String, dynamic>?;
+
+      if (sessionReport == null) return roster;
+
+      final engagements = (sessionReport['studentEngagements'] as List?) ?? [];
+      final engMap = <String, Map<String, dynamic>>{
+        for (final e in engagements)
+          (e['studentId'] as String? ?? ''): e as Map<String, dynamic>,
+      };
+
+      return roster.map((s) {
+        final eng = engMap[s.id];
+        if (eng == null) return s;
+        return StudentModel.fromJson({
+          'id': s.id,
+          'name': s.name,
+          'status': _mapEngagementLevel(eng['engagementLevel'] as String?),
+          'statusNote': s.statusNote,
+          'classCode': s.classCode,
+        });
+      }).toList();
+    } catch (_) {
+      return roster;
+    }
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  // Maps droid engagementLevel → app student status string.
+  static String _mapEngagementLevel(String? level) => switch (level) {
+        'high' => 'engaged',
+        'medium' => 'engaged',
+        'low' => 'distracted',
+        'absent' => 'flagged',
+        _ => 'engaged',
+      };
 }
