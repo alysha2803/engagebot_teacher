@@ -26,3 +26,12 @@ export async function registerClassGroup(data: CreateClassGroupInput): Promise<C
   }
   return apiClient.post<ClassGroup>("/class-groups", data);
 }
+
+export async function updateClassroom(id: string, patch: Partial<Pick<ClassGroup, "recessTime" | "room" | "droidId">>): Promise<ClassGroup> {
+  if (!isConfigured()) {
+    const g = MOCK_CLASSROOMS.find((c) => c.id === id);
+    if (g) Object.assign(g, patch);
+    return g!;
+  }
+  return apiClient.patch<ClassGroup>(`/class-groups/${id}`, patch);
+}

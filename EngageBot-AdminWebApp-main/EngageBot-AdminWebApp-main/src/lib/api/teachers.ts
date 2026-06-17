@@ -2,11 +2,11 @@ import type { Teacher, CreateTeacherInput } from "@/lib/types";
 import { apiClient, isConfigured } from "@/lib/api-client";
 
 export const MOCK_TEACHERS: Teacher[] = [
-  { id: "1", employeeId: "EB-2024-042", name: "Siti Aminah binti Yusof", email: "siti.aminah@moe.gov.my", department: "Science & Math", assignedClasses: ["4 Bestari", "5 Amanah"], dateAdded: "2024-01-12", status: "active" },
-  { id: "2", employeeId: "EB-2024-055", name: "Robert Tan Wei Keong", email: "robert.tan@moe.gov.my", department: "Languages", assignedClasses: ["3 Cekap", "6 Gigih"], dateAdded: "2024-01-15", status: "active" },
-  { id: "3", employeeId: "EB-2024-089", name: "Ahmad Faizal Bin Kassim", email: "ahmad.faizal@moe.gov.my", department: "Social Studies", assignedClasses: ["4 Maju"], dateAdded: "2024-02-02", status: "active" },
-  { id: "4", employeeId: "EB-2024-112", name: "Nandini Rajaratnam", email: "nandini.r@moe.gov.my", department: "Science & Math", assignedClasses: ["5 Bestari", "5 Cekap"], dateAdded: "2024-03-10", status: "active" },
-  { id: "5", employeeId: "EB-2024-156", name: "Mohd Ridzuan bin Ismail", email: "ridzuan@moe.gov.my", department: "Technical & Vocational", assignedClasses: ["6 Bestari", "6 Maju"], dateAdded: "2024-03-22", status: "active" },
+  { id: "1", employeeId: "EB-2024-042", name: "Siti Aminah binti Yusof", email: "siti.aminah@moe.gov.my", department: "Science & Math", subjects: ["Mathematics", "Science"], assignedClasses: ["4 Bestari", "5 Amanah"], dateAdded: "2024-01-12", status: "active" },
+  { id: "2", employeeId: "EB-2024-055", name: "Robert Tan Wei Keong", email: "robert.tan@moe.gov.my", department: "Languages", subjects: ["English Language", "Bahasa Melayu"], assignedClasses: ["3 Cekap", "6 Gigih"], dateAdded: "2024-01-15", status: "active" },
+  { id: "3", employeeId: "EB-2024-089", name: "Ahmad Faizal Bin Kassim", email: "ahmad.faizal@moe.gov.my", department: "Social Studies", subjects: [], assignedClasses: ["4 Maju"], dateAdded: "2024-02-02", status: "active" },
+  { id: "4", employeeId: "EB-2024-112", name: "Nandini Rajaratnam", email: "nandini.r@moe.gov.my", department: "Science & Math", subjects: ["Mathematics"], assignedClasses: ["5 Bestari", "5 Cekap"], dateAdded: "2024-03-10", status: "active" },
+  { id: "5", employeeId: "EB-2024-156", name: "Mohd Ridzuan bin Ismail", email: "ridzuan@moe.gov.my", department: "Technical & Vocational", subjects: [], assignedClasses: ["6 Bestari", "6 Maju"], dateAdded: "2024-03-22", status: "active" },
 ];
 
 export async function getTeachers(): Promise<Teacher[]> {
@@ -35,7 +35,7 @@ export async function registerTeacher(
   return apiClient.post<Teacher>("/teachers", { ...data, email: data.email.trim().toLowerCase() });
 }
 
-export type UpdateTeacherInput = Partial<Pick<Teacher, "name" | "email" | "department" | "assignedClasses" | "status">>;
+export type UpdateTeacherInput = Partial<Pick<Teacher, "name" | "email" | "department" | "subjects" | "assignedClasses" | "status">>;
 
 export async function updateTeacher(id: string, patch: UpdateTeacherInput): Promise<void> {
   if (!isConfigured()) {
@@ -44,4 +44,13 @@ export async function updateTeacher(id: string, patch: UpdateTeacherInput): Prom
     return;
   }
   await apiClient.patch(`/teachers/${id}`, patch);
+}
+
+export async function deleteTeacher(id: string): Promise<void> {
+  if (!isConfigured()) {
+    const i = MOCK_TEACHERS.findIndex((t) => t.id === id);
+    if (i !== -1) MOCK_TEACHERS.splice(i, 1);
+    return;
+  }
+  await apiClient.delete(`/teachers/${id}`);
 }
