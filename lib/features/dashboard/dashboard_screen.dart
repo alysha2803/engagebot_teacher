@@ -7,9 +7,9 @@ import '../../data/models/analytics_models.dart';
 import '../../shared/widgets/engagebot_scaffold.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import 'providers/dashboard_provider.dart';
+import '../classes/providers/classes_provider.dart';
 import 'widgets/live_session_card.dart';
 import 'widgets/class_selector_row.dart';
-import 'widgets/ai_recommendation_card.dart';
 import 'widgets/class_roster_section.dart';
 
 String _currentPeriod() {
@@ -61,124 +61,178 @@ class DashboardScreen extends ConsumerWidget {
         ),
         actions: const [],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 20),
+      body: !state.hasLoadedFromApi
+          ? const Center(child: CircularProgressIndicator())
+          : state.classes.isEmpty
+              ? _NoClassesView()
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
 
-            // ── Live Session Card ──────────────────────────────────────────
-            LiveSessionCard(
-              percentage: state.liveEngagement['percentage'] as int,
-              trend: state.liveEngagement['trend'] as String,
-              sessionMinutes: state.liveEngagement['sessionMinutes'] as int,
-              droidStatus: state.liveEngagement['droidStatus'] as String,
-              period: _currentPeriod(),
-            ),
+                      // ── Live Session Card ──────────────────────────────────────────
+                      LiveSessionCard(
+                        percentage: state.liveEngagement['percentage'] as int,
+                        trend: state.liveEngagement['trend'] as String,
+                        sessionMinutes:
+                            state.liveEngagement['sessionMinutes'] as int,
+                        droidStatus:
+                            state.liveEngagement['droidStatus'] as String,
+                        period: _currentPeriod(),
+                        hasClasses: true,
+                      ),
 
-            const SizedBox(height: 24),
+                      const SizedBox(height: 24),
 
-            // ── Select Class ───────────────────────────────────────────────
-            SectionHeader(
-              title: 'Select Class',
-              trailing: TextButton(
-                onPressed: () => context.go('/classes'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primaryGreen,
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'View All',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                      // ── Select Class ───────────────────────────────────────────────
+                      SectionHeader(
+                        title: 'Select Class',
+                        trailing: TextButton(
+                          onPressed: () {
+                            ref.read(classesProvider.notifier).setTab(ClassesTab.periods);
+                            context.go('/classes');
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.primaryGreen,
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text(
+                            'View All',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ClassSelectorRow(
+                        classes: state.classes,
+                        selectedIndex: state.selectedClassIndex,
+                        onSelect: (i) {
+                          notifier.selectClass(i);
+                          context.push(
+                            '/class-detail/${Uri.encodeComponent(state.classes[i].code)}',
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // ── Class Roster ───────────────────────────────────────────────
+                      ClassRosterSection(
+                        students: state.roster,
+                        onlineCount: state.roster
+                            .where((s) => s.status == 'engaged')
+                            .length,
+                        onStudentTap: (student) =>
+                            context.push('/students/${student.id}'),
+                        onStudentEdited: (updated) =>
+                            notifier.editStudent(updated.id, updated),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // ── Bottom Action Row ──────────────────────────────────────────
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => context.go('/reports'),
+                              icon: const Icon(Icons.description_outlined,
+                                  size: 18),
+                              label: const Text('Generate Report'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryGreen,
+                                foregroundColor: Colors.white,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () =>
+                                  _showTeachingRecommendations(context),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                side: BorderSide(color: context.colorBorder),
+                                foregroundColor: context.colorOnCard,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Teaching Tips',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 32),
+                    ],
                   ),
                 ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// No classes assigned placeholder
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NoClassesView extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: context.colorIconBg,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.calendar_today_outlined,
+                size: 32,
+                color: AppColors.primaryGreen,
               ),
             ),
-            const SizedBox(height: 12),
-            // Tapping a class chip: selects it (updates roster preview) AND
-            // navigates to the full Class Analytics page for that class.
-            ClassSelectorRow(
-              classes: state.classes,
-              selectedIndex: state.selectedClassIndex,
-              onSelect: (i) {
-                notifier.selectClass(i);
-                context.push(
-                  '/class-detail/${Uri.encodeComponent(state.classes[i].code)}',
-                );
-              },
-            ),
-
             const SizedBox(height: 20),
-
-            // ── AI Recommendation ──────────────────────────────────────────
-            AIRecommendationCard(
-              text: state.aiRecommendation['text'] as String,
-              highlightWord: state.aiRecommendation['highlightWord'] as String,
-              actionLabel: state.aiRecommendation['action'] as String,
-              onApply: () {},
+            Text(
+              'No Classes Assigned Yet',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: context.colorOnCard,
+              ),
             ),
-
-            const SizedBox(height: 24),
-
-            // ── Class Roster ───────────────────────────────────────────────
-            ClassRosterSection(
-              students: state.roster,
-              onlineCount: state.roster
-                  .where((s) => s.status == 'engaged')
-                  .length,
-              onStudentTap: (student) =>
-                  context.push('/students/${student.id}'),
-              onStudentEdited: (updated) =>
-                  notifier.editStudent(updated.id, updated),
+            const SizedBox(height: 8),
+            Text(
+              'Your schedule will appear here once an admin assigns classes to you.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: context.colorMuted,
+                height: 1.5,
+              ),
             ),
-
-            const SizedBox(height: 20),
-
-            // ── Bottom Action Row ──────────────────────────────────────────
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => context.go('/reports'),
-                    icon: const Icon(Icons.description_outlined, size: 18),
-                    label: const Text('Generate Report'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryGreen,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => _showTeachingRecommendations(context),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: BorderSide(color: context.colorBorder),
-                      foregroundColor: context.colorOnCard,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Teaching Tips',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 32),
           ],
         ),
       ),

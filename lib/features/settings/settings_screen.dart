@@ -25,13 +25,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => _EditProfileSheet(
         initialName: state.teacherName,
-        initialSchool: state.teacherSchool,
-        onSaved: (name, school) {
-          ref
-              .read(settingsProvider.notifier)
-              .updateProfile(name: name, school: school);
-          _snack('Profile updated');
-        },
+        onSaved: (name) => ref
+            .read(settingsProvider.notifier)
+            .updateProfile(name: name)
+            .then((_) => _snack('Profile updated', success: true))
+            .catchError((_) => _snack('Failed to save name. Check your connection.')),
       ),
     );
   }
@@ -363,7 +361,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            MockDataService.getTeacherProfile().subject,
+                            prefs.teacherSubject,
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -815,12 +813,10 @@ class _ThemedSheet extends StatelessWidget {
 
 class _EditProfileSheet extends StatefulWidget {
   final String initialName;
-  final String initialSchool;
-  final void Function(String name, String school) onSaved;
+  final void Function(String name) onSaved;
 
   const _EditProfileSheet({
     required this.initialName,
-    required this.initialSchool,
     required this.onSaved,
   });
 
@@ -830,19 +826,16 @@ class _EditProfileSheet extends StatefulWidget {
 
 class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _schoolCtrl;
 
   @override
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.initialName);
-    _schoolCtrl = TextEditingController(text: widget.initialSchool);
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _schoolCtrl.dispose();
     super.dispose();
   }
 
@@ -883,8 +876,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             ),
           ),
           const SizedBox(height: 20),
-
-          // Name field
           Text('Full Name',
               style: TextStyle(
                   fontSize: 12,
@@ -896,38 +887,18 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(
               hintText: 'e.g. Ms. Sarah Halim',
-              prefixIcon:
-                  Icon(Icons.person_outline, size: 18),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // School field
-          Text('School',
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: onSurface.withValues(alpha: 0.55))),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _schoolCtrl,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              hintText: 'e.g. SMK Bandar Kinrara',
-              prefixIcon: Icon(Icons.school_outlined, size: 18),
+              prefixIcon: Icon(Icons.person_outline, size: 18),
             ),
           ),
           const SizedBox(height: 24),
-
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
                 final name = _nameCtrl.text.trim();
-                final school = _schoolCtrl.text.trim();
                 if (name.isEmpty) return;
                 Navigator.pop(context);
-                widget.onSaved(name, school);
+                widget.onSaved(name);
               },
               child: const Text('Save Changes',
                   style: TextStyle(fontWeight: FontWeight.w600)),

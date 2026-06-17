@@ -7,7 +7,7 @@ import '../../data/mock/mock_data_service.dart';
 import '../../data/models/analytics_models.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
-import '../../data/services/firebase_data_service.dart';
+import '../../data/services/mongo_data_service.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import '../auth/providers/auth_provider.dart';
 import '../dashboard/providers/dashboard_provider.dart';
@@ -68,10 +68,25 @@ class _ClassAnalyticsScreenState extends ConsumerState<ClassAnalyticsScreen>
   Future<void> _loadRosterFromFirebase() async {
     final teacherId = ref.read(currentTeacherIdProvider) ?? '';
     if (teacherId.isEmpty || !mounted) return;
-    final fbRoster = await FirebaseDataService.getRosterForClass(
+    final fbRoster = await MongoDataService.getRosterForClass(
         widget.classCode, teacherId);
     if (!mounted) return;
-    setState(() => _baseRoster = fbRoster);
+    setState(() {
+      _baseRoster = fbRoster;
+      // Derive behaviour records from the real roster. Engagement metrics
+      // (score, attention minutes, off-task count) will come from the droid
+      // once it is available; until then use neutral placeholders.
+      _baseBehaviourData = fbRoster
+          .map((s) => StudentBehaviourRecord(
+                studentId: s.id,
+                studentName: s.name,
+                engagementScore: 75,
+                attentionMinutes: 30,
+                offTaskCount: 0,
+                dominantStatus: s.status,
+              ))
+          .toList();
+    });
   }
 
   @override

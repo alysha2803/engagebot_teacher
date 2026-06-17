@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../shared/widgets/engagebot_scaffold.dart';
-import '../../data/mock/mock_data_service.dart';
 import 'providers/classes_provider.dart';
 import 'widgets/classes_widgets.dart';
 
@@ -107,7 +106,6 @@ class ClassesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(classesProvider);
     final notifier = ref.read(classesProvider.notifier);
-    final insight = MockDataService.getDroidInsight();
     final isPeriods = state.activeTab == ClassesTab.periods;
 
     return Scaffold(
@@ -197,11 +195,6 @@ class ClassesScreen extends ConsumerWidget {
                 onTap: (cls) => context.push(
                   '/class-detail/${Uri.encodeComponent(cls.code)}',
                 ),
-              ),
-              const SizedBox(height: 24),
-              DroidInsightsSection(
-                title: insight['title']!,
-                description: insight['description']!,
               ),
             ] else ...[
               // Students — ranked attention list

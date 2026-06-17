@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/mock/mock_data_service.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
-import '../../../data/services/firebase_data_service.dart';
+import '../../../data/services/mongo_data_service.dart';
 import '../../auth/providers/auth_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -25,6 +26,9 @@ class DashboardState {
   final List<StudentModel> roster;
   final Map<String, dynamic> aiRecommendation;
   final bool isLoading;
+  // True after the first successful API fetch — distinguishes "API returned
+  // empty" from "still waiting for the first response".
+  final bool hasLoadedFromApi;
 
   const DashboardState({
     required this.liveEngagement,
@@ -33,6 +37,7 @@ class DashboardState {
     required this.roster,
     required this.aiRecommendation,
     this.isLoading = false,
+    this.hasLoadedFromApi = false,
   });
 
   DashboardState copyWith({
@@ -42,6 +47,7 @@ class DashboardState {
     List<StudentModel>? roster,
     Map<String, dynamic>? aiRecommendation,
     bool? isLoading,
+    bool? hasLoadedFromApi,
   }) =>
       DashboardState(
         liveEngagement: liveEngagement ?? this.liveEngagement,
@@ -50,11 +56,13 @@ class DashboardState {
         roster: roster ?? this.roster,
         aiRecommendation: aiRecommendation ?? this.aiRecommendation,
         isLoading: isLoading ?? this.isLoading,
+        hasLoadedFromApi: hasLoadedFromApi ?? this.hasLoadedFromApi,
       );
 }
 
 class DashboardNotifier extends StateNotifier<DashboardState> {
   final Ref _ref;
+  Timer? _refreshTimer;
 
   DashboardNotifier(this._ref)
       : super(DashboardState(
@@ -66,15 +74,35 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         )) {
     // Listen for sign-in events that occur after this notifier is created.
     _ref.listen<String?>(currentTeacherIdProvider, (_, next) {
-      if (next != null && next.isNotEmpty) refreshFromFirebase(next);
+      if (next != null && next.isNotEmpty) {
+        refreshFromFirebase(next);
+        _startPeriodicRefresh(next);
+      }
     });
 
     // If the session was already restored (app restart with existing auth),
-    // kick off a Firebase refresh immediately without blocking the constructor.
+    // kick off a refresh immediately without blocking the constructor.
     Future.microtask(() {
       final id = _ref.read(currentTeacherIdProvider);
-      if (id != null && id.isNotEmpty) refreshFromFirebase(id);
+      if (id != null && id.isNotEmpty) {
+        refreshFromFirebase(id);
+        _startPeriodicRefresh(id);
+      }
     });
+  }
+
+  void _startPeriodicRefresh(String teacherId) {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (!mounted) return;
+      refreshFromFirebase(teacherId);
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   /// Merge a freshly-loaded roster with any persisted edits from the global store.
@@ -88,15 +116,15 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
     if (!mounted) return;
     state = state.copyWith(isLoading: true);
 
-    final classes = await FirebaseDataService.getClasses(teacherId);
+    final classes = await MongoDataService.getClasses(teacherId);
     if (!mounted) return;
 
     final classCode = classes.isNotEmpty ? classes[0].code : '';
 
     // Fetch roster (with droid engagement overlay) and live session in parallel.
     final rosterFuture =
-        FirebaseDataService.getRosterWithEngagement(classCode, teacherId);
-    final liveFuture = FirebaseDataService.getLiveSession(classCode);
+        MongoDataService.getRosterWithEngagement(classCode, teacherId);
+    final liveFuture = MongoDataService.getLiveSession(classCode);
 
     final roster = await rosterFuture;
     final liveSession = await liveFuture;
@@ -109,6 +137,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       liveEngagement:
           liveSession != null ? _mapLiveSession(liveSession) : state.liveEngagement,
       isLoading: false,
+      hasLoadedFromApi: true,
     );
   }
 
@@ -156,7 +185,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
     final teacherId = _ref.read(currentTeacherIdProvider) ?? '';
 
     final baseRoster = teacherId.isNotEmpty
-        ? await FirebaseDataService.getRosterWithEngagement(classCode, teacherId)
+        ? await MongoDataService.getRosterWithEngagement(classCode, teacherId)
         : MockDataService.getRosterForClass(classCode);
 
     if (!mounted) return;
@@ -168,7 +197,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 
   void editStudent(String studentId, StudentModel updated) {
     // Persist to Firestore (fire-and-forget — UI updates via in-memory overlay).
-    FirebaseDataService.updateStudent(studentId, updated);
+    MongoDataService.updateStudent(studentId, updated);
     // Persist to global store so other screens and future selectClass calls
     // pick up the change without hitting MockDataService again.
     _ref.read(studentEditsProvider.notifier).update(

@@ -9,6 +9,7 @@ class LiveSessionCard extends StatelessWidget {
   final int sessionMinutes;
   final String droidStatus;
   final String period;
+  final bool hasClasses;
 
   const LiveSessionCard({
     super.key,
@@ -17,6 +18,7 @@ class LiveSessionCard extends StatelessWidget {
     required this.sessionMinutes,
     required this.droidStatus,
     required this.period,
+    this.hasClasses = true,
   });
 
   @override
@@ -104,35 +106,36 @@ class LiveSessionCard extends StatelessWidget {
             ),
           ),
 
-          // Right: droid face + status badge
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const SizedBox(
-                width: 88,
-                height: 88,
-                child: CustomPaint(painter: DroidFacePainter()),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryGreenDark,
-                  borderRadius: BorderRadius.circular(20),
+          // Right: droid face + status badge (hidden when no classes assigned)
+          if (hasClasses)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const SizedBox(
+                  width: 88,
+                  height: 88,
+                  child: CustomPaint(painter: DroidFacePainter()),
                 ),
-                child: Text(
-                  'DROID: $droidStatus',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: 0.8,
+                const SizedBox(height: 12),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGreenDark,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'DROID: $droidStatus',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.8,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );

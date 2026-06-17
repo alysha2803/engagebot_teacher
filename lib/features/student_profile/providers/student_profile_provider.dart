@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/mock/mock_data_service.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/models/observation_model.dart';
+import '../../classes/providers/classes_provider.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -11,7 +12,7 @@ import '../../dashboard/providers/dashboard_provider.dart';
 class StudentProfileState {
   final StudentProfile profile;
   final List<ObservationModel> observations;
-  final String activeFilter; // observation category filter
+  final String activeFilter;
   final bool isLoading;
 
   const StudentProfileState({
@@ -36,10 +37,16 @@ class StudentProfileState {
 }
 
 class StudentProfileNotifier extends StateNotifier<StudentProfileState> {
+  final String _studentId;
+
   StudentProfileNotifier(String studentId, Ref ref)
-      : super(_buildInitialState(studentId, ref.read(studentEditsProvider))) {
-    // Re-apply whenever a student edit is committed (e.g. name changed from
-    // the dashboard roster) so the profile page stays in sync.
+      : _studentId = studentId,
+        super(_buildInitialState(
+          studentId,
+          ref.read(studentEditsProvider),
+          ref.read(classesProvider).allStudents,
+        )) {
+    // Keep name in sync when teacher edits it from the dashboard roster.
     ref.listen<Map<String, StudentModel>>(
       studentEditsProvider,
       (_, edits) {
@@ -51,17 +58,49 @@ class StudentProfileNotifier extends StateNotifier<StudentProfileState> {
         }
       },
     );
+
+    // When classesProvider loads real students from DB, update name + class.
+    ref.listen<List<StudentWithClass>>(
+      classesProvider.select((s) => s.allStudents),
+      (_, students) {
+        final match = students
+            .where((sw) => sw.student.id == _studentId)
+            .firstOrNull;
+        if (match == null) return;
+        final edits = ref.read(studentEditsProvider);
+        final name = edits[_studentId]?.name ?? match.student.name;
+        state = state.copyWith(
+          profile: state.profile.copyWith(
+            name: name,
+            className: match.classCode,
+          ),
+        );
+      },
+    );
   }
 
   static StudentProfileState _buildInitialState(
-      String studentId, Map<String, StudentModel> edits) {
+    String studentId,
+    Map<String, StudentModel> edits,
+    List<StudentWithClass> allStudents,
+  ) {
+    // Look up the real student from the DB-loaded class roster.
+    final realStudent = allStudents
+        .where((sw) => sw.student.id == studentId)
+        .firstOrNull;
+
+    // Prefer: explicit edit override → real DB name → mock fallback.
+    final name = edits[studentId]?.name ?? realStudent?.student.name;
+    final classCode = realStudent?.classCode;
+
+    // Build mock profile template then overlay real name/class.
     final baseProfile = MockDataService.getStudentProfile(studentId);
-    // Apply any name override that was saved before this screen opened.
-    final override = edits[studentId];
-    final profile =
-        override != null ? baseProfile.copyWith(name: override.name) : baseProfile;
+    final profile = baseProfile.copyWith(
+      name: name ?? baseProfile.name,
+      className: classCode ?? baseProfile.className,
+    );
+
     return StudentProfileState(
-      // TODO: Replace with droid student engagement API
       profile: profile,
       observations: MockDataService.getObservations(),
     );
@@ -69,14 +108,10 @@ class StudentProfileNotifier extends StateNotifier<StudentProfileState> {
 
   void setFilter(String filter) => state = state.copyWith(activeFilter: filter);
 
-  /// Add a new observation note.
   void addObservation(ObservationModel obs) {
-    state = state.copyWith(
-      observations: [...state.observations, obs],
-    );
+    state = state.copyWith(observations: [...state.observations, obs]);
   }
 
-  /// Update an existing observation by id.
   void updateObservation(ObservationModel updated) {
     state = state.copyWith(
       observations: state.observations
@@ -85,7 +120,6 @@ class StudentProfileNotifier extends StateNotifier<StudentProfileState> {
     );
   }
 
-  /// Delete an observation by id.
   void deleteObservation(String id) {
     state = state.copyWith(
       observations: state.observations.where((o) => o.id != id).toList(),
@@ -93,7 +127,6 @@ class StudentProfileNotifier extends StateNotifier<StudentProfileState> {
   }
 }
 
-/// Family provider — keyed by studentId so each profile gets its own state.
 final studentProfileProvider = StateNotifierProvider.family<
     StudentProfileNotifier, StudentProfileState, String>(
   (ref, studentId) => StudentProfileNotifier(studentId, ref),

@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/mock/mock_data_service.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
-import '../../../data/services/firebase_data_service.dart';
+import '../../../data/services/mongo_data_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 
@@ -152,20 +152,47 @@ class ClassesNotifier extends StateNotifier<ClassesState> {
       final id = _ref.read(currentTeacherIdProvider) ?? '';
       if (id.isNotEmpty) refreshFromFirebase(id);
     });
+
+    // Re-sync whenever dashboardProvider refreshes its class list (e.g. every
+    // 60 s or after the admin edits the schedule).
+    _ref.listen<List<ClassModel>>(
+      dashboardProvider.select((s) => s.classes),
+      (prev, next) {
+        if (next == prev) return;
+        final id = _ref.read(currentTeacherIdProvider) ?? '';
+        if (id.isNotEmpty) refreshFromFirebase(id);
+      },
+    );
   }
 
-  /// Loads the real class list and full student roster from Firestore,
-  /// replacing the mock-populated initial state.
+  /// Loads the real class list and full student roster from the API.
   Future<void> refreshFromFirebase(String teacherId) async {
     if (!mounted) return;
     state = state.copyWith(isLoading: true);
 
-    final classes = await FirebaseDataService.getClasses(teacherId);
+    final classes = await MongoDataService.getClasses(teacherId);
     if (!mounted) return;
 
     final allFromFirebase =
-        await FirebaseDataService.getAllStudentsForTeacher(teacherId);
+        await MongoDataService.getAllStudentsForTeacher(teacherId);
     if (!mounted) return;
+
+    // Count students per class code so ClassCard shows real numbers.
+    final countByClass = <String, int>{};
+    for (final s in allFromFirebase) {
+      if (s.classCode != null && s.classCode!.isNotEmpty) {
+        countByClass[s.classCode!] = (countByClass[s.classCode!] ?? 0) + 1;
+      }
+    }
+
+    final updatedClasses = classes
+        .map((c) => ClassModel(
+              code: c.code,
+              subject: c.subject,
+              studentCount: countByClass[c.code] ?? 0,
+              status: c.status,
+            ))
+        .toList();
 
     final edits = _ref.read(studentEditsProvider);
     final allStudents = allFromFirebase
@@ -177,7 +204,7 @@ class ClassesNotifier extends StateNotifier<ClassesState> {
         .toList();
 
     state = state.copyWith(
-      classes: classes,
+      classes: updatedClasses,
       allStudents: allStudents,
       isLoading: false,
     );

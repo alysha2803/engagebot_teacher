@@ -67,6 +67,10 @@ class ApiService {
     return res.data!;
   }
 
+  static Future<void> updateMyProfile(Map<String, dynamic> patch) async {
+    await _dio.patch('/teachers/profile', data: patch);
+  }
+
   // ── Classes ─────────────────────────────────────────────────────────────────
 
   static Future<List<dynamic>> getSchedules({String? teacherId}) async {

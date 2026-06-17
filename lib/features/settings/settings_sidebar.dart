@@ -5,6 +5,7 @@ import '../../app/router/app_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../data/mock/mock_data_service.dart';
 import '../auth/providers/auth_provider.dart';
+import '../dashboard/providers/dashboard_provider.dart';
 import 'providers/settings_provider.dart';
 import 'widgets/droid_illustration_painter.dart';
 
@@ -67,10 +68,19 @@ class _SettingsSidebarState extends ConsumerState<SettingsSidebar> {
       backgroundColor: Colors.transparent,
       builder: (_) => _EditProfileSheet(
         initialName: state.teacherName,
-        initialSchool: state.teacherSchool,
-        onSaved: (name, school) => ref
+        onSaved: (name) => ref
             .read(settingsProvider.notifier)
-            .updateProfile(name: name, school: school),
+            .updateProfile(name: name)
+            .catchError((_) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to save name. Check your connection.'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            }),
       ),
     );
   }
@@ -106,6 +116,11 @@ class _SettingsSidebarState extends ConsumerState<SettingsSidebar> {
     final prefs = ref.watch(settingsProvider);
     final notifier = ref.read(settingsProvider.notifier);
     final droid = MockDataService.getDroidStatus();
+    final dashClasses = ref.watch(dashboardProvider).classes;
+    final hasClasses = dashClasses.isNotEmpty;
+    final activeClassName = hasClasses
+        ? dashClasses.map((c) => c.code).join(', ')
+        : '';
     final th = Theme.of(context);
     final isDark = prefs.darkMode;
     final iconBg = isDark ? const Color(0xFF1E2B1A) : AppColors.sageLighter;
@@ -197,7 +212,7 @@ class _SettingsSidebarState extends ConsumerState<SettingsSidebar> {
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
-                                  MockDataService.getTeacherProfile().subject,
+                                  prefs.teacherSubject,
                                   style: const TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w600,
@@ -225,72 +240,73 @@ class _SettingsSidebarState extends ConsumerState<SettingsSidebar> {
                     child: Divider(height: 1, color: th.dividerColor),
                   ),
 
-                  // ── Droid ─────────────────────────────────────────────
-                  _SectionLabel('DROID DEVICE'),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: th.colorScheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: th.dividerColor),
-                      ),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 36,
-                            height: 44,
-                            child: CustomPaint(
-                                painter: DroidIllustrationPainter()),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                  // ── Droid (only shown when teacher has assigned classes) ──
+                  if (hasClasses) ...[
+                    _SectionLabel('DROID DEVICE'),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: th.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: th.dividerColor),
+                        ),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 36,
+                              height: 44,
+                              child: CustomPaint(
+                                  painter: DroidIllustrationPainter()),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    droid['droidId'] as String,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: th.colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  Text(
+                                    activeClassName,
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.primaryGreen),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(
-                                  droid['droidId'] as String,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: th.colorScheme.onSurface,
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.successGreen,
+                                    shape: BoxShape.circle,
                                   ),
                                 ),
-                                Text(
-                                  droid['activeClass'] as String,
-                                  style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.primaryGreen),
-                                ),
+                                const SizedBox(width: 4),
+                                Text('Active',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.successGreen,
+                                        fontWeight: FontWeight.w600)),
                               ],
                             ),
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 7,
-                                height: 7,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.successGreen,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text('Active',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.successGreen,
-                                      fontWeight: FontWeight.w600)),
-                            ],
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
+                  ],
 
                   // ── Preferences ────────────────────────────────────────
                   _SectionLabel('PREFERENCES'),
@@ -528,12 +544,10 @@ class _LinkTile extends StatelessWidget {
 
 class _EditProfileSheet extends StatefulWidget {
   final String initialName;
-  final String initialSchool;
-  final void Function(String name, String school) onSaved;
+  final void Function(String name) onSaved;
 
   const _EditProfileSheet({
     required this.initialName,
-    required this.initialSchool,
     required this.onSaved,
   });
 
@@ -543,19 +557,16 @@ class _EditProfileSheet extends StatefulWidget {
 
 class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _schoolCtrl;
 
   @override
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.initialName);
-    _schoolCtrl = TextEditingController(text: widget.initialSchool);
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _schoolCtrl.dispose();
     super.dispose();
   }
 
@@ -603,30 +614,15 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 hintText: 'e.g. Ms. Sarah Halim',
                 prefixIcon: Icon(Icons.person_outline, size: 18)),
           ),
-          const SizedBox(height: 16),
-          Text('School',
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: onSurface.withValues(alpha: 0.55))),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _schoolCtrl,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-                hintText: 'e.g. SMK Bandar Kinrara',
-                prefixIcon: Icon(Icons.school_outlined, size: 18)),
-          ),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
                 final name = _nameCtrl.text.trim();
-                final school = _schoolCtrl.text.trim();
                 if (name.isEmpty) return;
                 Navigator.pop(context);
-                widget.onSaved(name, school);
+                widget.onSaved(name);
               },
               child: const Text('Save Changes',
                   style: TextStyle(fontWeight: FontWeight.w600)),

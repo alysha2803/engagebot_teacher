@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/app_colors.dart';
-import '../../data/mock/mock_data_service.dart';
 import '../../shared/widgets/engagebot_scaffold.dart';
 import '../../data/models/export_history_model.dart';
 import '../../shared/widgets/shared_widgets.dart';
+import '../dashboard/providers/dashboard_provider.dart';
 import 'providers/reports_provider.dart';
 
 /// Reports & Export — Tab 2.
@@ -38,7 +38,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   // ── Class picker ─────────────────────────────────────────────────────────
 
   void _showClassPicker() {
-    final classes = MockDataService.getClasses();
+    final classes = ref.read(dashboardProvider).classes;
     final current = ref.read(reportsProvider).selectedClass;
 
     showModalBottomSheet(
@@ -46,33 +46,41 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => _BottomSheet(
         title: 'Select Class',
-        child: Column(
-          children: classes.map((cls) {
-            final label = '${cls.code} : ${cls.subject}';
-            final selected = label == current;
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                label,
-                style: TextStyle(
-                  fontWeight:
-                      selected ? FontWeight.w600 : FontWeight.normal,
-                  color: selected
-                      ? AppColors.primaryGreen
-                      : AppColors.textPrimary,
+        child: classes.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'No classes assigned yet.',
+                  style: TextStyle(color: AppColors.textSecondary),
                 ),
+              )
+            : Column(
+                children: classes.map((cls) {
+                  final label = '${cls.code} : ${cls.subject}';
+                  final selected = label == current;
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      label,
+                      style: TextStyle(
+                        fontWeight:
+                            selected ? FontWeight.w600 : FontWeight.normal,
+                        color: selected
+                            ? AppColors.primaryGreen
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                    trailing: selected
+                        ? const Icon(Icons.check,
+                            color: AppColors.primaryGreen, size: 18)
+                        : null,
+                    onTap: () {
+                      ref.read(reportsProvider.notifier).selectClass(label);
+                      Navigator.pop(context);
+                    },
+                  );
+                }).toList(),
               ),
-              trailing: selected
-                  ? const Icon(Icons.check,
-                      color: AppColors.primaryGreen, size: 18)
-                  : null,
-              onTap: () {
-                ref.read(reportsProvider.notifier).selectClass(label);
-                Navigator.pop(context);
-              },
-            );
-          }).toList(),
-        ),
       ),
     );
   }
@@ -166,7 +174,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   // ── Generate export ──────────────────────────────────────────────────────
 
   Future<void> _generateExport(String type) async {
-    // Show generating dialog
     if (!mounted) return;
     showDialog(
       context: context,
@@ -188,7 +195,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              ref.read(reportsProvider).selectedClass,
+              ref.read(reportsProvider).selectedClass.isEmpty
+                  ? 'All Classes'
+                  : ref.read(reportsProvider).selectedClass,
               style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -201,7 +210,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
     await ref.read(reportsProvider.notifier).generateExport(type);
 
-    if (mounted) Navigator.of(context).pop(); // dismiss dialog
+    if (mounted) Navigator.of(context).pop();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -220,177 +229,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         ),
       );
     }
-  }
-
-  // ── Edit schedule ────────────────────────────────────────────────────────
-
-  void _showEditSchedule() {
-    final state = ref.read(reportsProvider);
-    String selectedDay = state.scheduledDay;
-    String selectedTime = state.scheduledTime;
-    String selectedFormat = state.scheduledFormat;
-
-    const days = [
-      'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
-      'Sunday'
-    ];
-    const times = ['7:00 AM', '8:00 AM', '12:00 PM', '4:00 PM', '6:00 PM'];
-    const formats = ['PDF', 'CSV'];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setSheet) => _BottomSheet(
-          title: 'Edit Schedule',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Day
-              const _SheetLabel('Day'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: days.map((d) {
-                  final sel = d == selectedDay;
-                  return GestureDetector(
-                    onTap: () => setSheet(() => selectedDay = d),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: sel
-                            ? AppColors.primaryGreen
-                            : AppColors.backgroundLight,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        d.substring(0, 3),
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: sel ? Colors.white : AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Time
-              const _SheetLabel('Time'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: times.map((t) {
-                  final sel = t == selectedTime;
-                  return GestureDetector(
-                    onTap: () => setSheet(() => selectedTime = t),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: sel
-                            ? AppColors.primaryGreen
-                            : AppColors.backgroundLight,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        t,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: sel ? Colors.white : AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Format
-              const _SheetLabel('Format'),
-              const SizedBox(height: 8),
-              Row(
-                children: formats.map((f) {
-                  final sel = f == selectedFormat;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: GestureDetector(
-                      onTap: () => setSheet(() => selectedFormat = f),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: sel
-                              ? AppColors.primaryGreen
-                              : AppColors.backgroundLight,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          f,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color:
-                                sel ? Colors.white : AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              const SizedBox(height: 28),
-
-              // Save button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    ref.read(reportsProvider.notifier).updateSchedule(
-                          day: selectedDay,
-                          time: selectedTime,
-                          format: selectedFormat,
-                        );
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                            'Schedule updated: $selectedDay at $selectedTime ($selectedFormat)'),
-                        backgroundColor: AppColors.primaryGreen,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text('Save Schedule',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   // ── Share / download feedback ─────────────────────────────────────────────
@@ -505,7 +343,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   const SizedBox(height: 6),
                   _FilterRow(
                     icon: Icons.group_outlined,
-                    label: state.selectedClass,
+                    label: state.selectedClass.isEmpty
+                        ? 'Select a class'
+                        : state.selectedClass,
                     onTap: _showClassPicker,
                   ),
                   const SizedBox(height: 12),
@@ -570,144 +410,26 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               ],
             ),
 
-            const SizedBox(height: 16),
-
-            // ── Scheduled Summaries ──────────────────────────────────────
-            AppCard(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Column(
-                children: [
-                  GestureDetector(
-                    onTap: notifier.toggleScheduled,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 34,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: AppColors.backgroundLight,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.schedule,
-                              size: 18,
-                              color: AppColors.textSecondary),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Scheduled Summaries',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              Text(
-                                state.scheduledSummaryLabel,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textMuted,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        AnimatedRotation(
-                          turns: state.scheduledExpanded ? 0.5 : 0,
-                          duration: const Duration(milliseconds: 200),
-                          child: const Icon(Icons.keyboard_arrow_down,
-                              color: AppColors.textMuted),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Expandable detail
-                  AnimatedCrossFade(
-                    duration: const Duration(milliseconds: 200),
-                    crossFadeState: state.scheduledExpanded
-                        ? CrossFadeState.showSecond
-                        : CrossFadeState.showFirst,
-                    firstChild: const SizedBox.shrink(),
-                    secondChild: Padding(
-                      padding: const EdgeInsets.only(top: 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Divider(
-                              height: 1, color: AppColors.borderLight),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Your scheduled ${state.scheduledFormat} summary is generated every ${state.scheduledDay} at ${state.scheduledTime} and sent to your registered email.',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                              height: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              OutlinedButton(
-                                onPressed: _showEditSchedule,
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                      color: AppColors.primaryGreen),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  foregroundColor: AppColors.primaryGreen,
-                                ),
-                                child: const Text('Edit Schedule',
-                                    style: TextStyle(fontSize: 13)),
-                              ),
-                              const SizedBox(width: 10),
-                              OutlinedButton(
-                                onPressed: () => _generateExport(
-                                    state.scheduledFormat),
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                      color: AppColors.borderLight),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  foregroundColor: AppColors.textSecondary,
-                                ),
-                                child: const Text('Run Now',
-                                    style: TextStyle(fontSize: 13)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
             const SizedBox(height: 24),
 
             // ── History ──────────────────────────────────────────────────
             SectionHeader(
               key: _historyKey,
               title: 'HISTORY',
-              trailing: TextButton(
-                onPressed: notifier.toggleShowAll,
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primaryGreen,
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                ),
-                child: Text(
-                  state.showAllHistory ? 'Show Less' : 'View All',
-                  style: const TextStyle(fontSize: 13),
-                ),
-              ),
+              trailing: state.allHistory.isNotEmpty
+                  ? TextButton(
+                      onPressed: notifier.toggleShowAll,
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primaryGreen,
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                      ),
+                      child: Text(
+                        state.showAllHistory ? 'Show Less' : 'View All',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    )
+                  : null,
             ),
             const SizedBox(height: 12),
 
@@ -837,25 +559,6 @@ class _BottomSheet extends StatelessWidget {
       ),
     );
   }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sheet label helper
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _SheetLabel extends StatelessWidget {
-  final String text;
-  const _SheetLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) => Text(
-        text,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-        ),
-      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

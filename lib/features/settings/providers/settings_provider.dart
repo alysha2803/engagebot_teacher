@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/mock/mock_data_service.dart';
-import '../../../data/services/firebase_data_service.dart';
+import '../../../data/services/mongo_data_service.dart';
 import '../../auth/providers/auth_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -15,6 +15,7 @@ class PreferencesState {
   final bool darkMode;
   final String teacherName;
   final String teacherSchool;
+  final String teacherSubject;
 
   const PreferencesState({
     required this.realtimeAlerts,
@@ -23,6 +24,7 @@ class PreferencesState {
     required this.darkMode,
     required this.teacherName,
     required this.teacherSchool,
+    this.teacherSubject = '',
   });
 
   PreferencesState copyWith({
@@ -32,6 +34,7 @@ class PreferencesState {
     bool? darkMode,
     String? teacherName,
     String? teacherSchool,
+    String? teacherSubject,
   }) =>
       PreferencesState(
         realtimeAlerts: realtimeAlerts ?? this.realtimeAlerts,
@@ -40,6 +43,7 @@ class PreferencesState {
         darkMode: darkMode ?? this.darkMode,
         teacherName: teacherName ?? this.teacherName,
         teacherSchool: teacherSchool ?? this.teacherSchool,
+        teacherSubject: teacherSubject ?? this.teacherSubject,
       );
 }
 
@@ -51,17 +55,13 @@ class SettingsNotifier extends StateNotifier<PreferencesState> {
   final Ref _ref;
 
   SettingsNotifier(this._ref) : super(_buildInitial()) {
-    // Listen for sign-in after the notifier is created (e.g., user signs in
-    // while the settings screen is still in the widget tree).
     _ref.listen<String?>(currentTeacherIdProvider, (_, next) {
-      if (next != null && next.isNotEmpty) refreshFromFirebase(next);
+      if (next != null && next.isNotEmpty) refreshFromApi(next);
     });
 
-    // Immediate load if the user was already authenticated when this provider
-    // was first created (e.g., restored session on app restart).
     Future.microtask(() {
       final id = _ref.read(currentTeacherIdProvider);
-      if (id != null && id.isNotEmpty) refreshFromFirebase(id);
+      if (id != null && id.isNotEmpty) refreshFromApi(id);
     });
   }
 
@@ -75,17 +75,19 @@ class SettingsNotifier extends StateNotifier<PreferencesState> {
       darkMode: false,
       teacherName: teacher.name,
       teacherSchool: teacher.school,
+      teacherSubject: teacher.subject,
     );
   }
 
-  // Overwrite name/school with Firestore data (falls back to mock if empty).
-  Future<void> refreshFromFirebase(String teacherId) async {
-    final profile = await FirebaseDataService.getTeacherProfile(teacherId);
+  Future<void> refreshFromApi(String teacherId) async {
+    final profile = await MongoDataService.getTeacherProfile(teacherId);
     if (!mounted) return;
     state = state.copyWith(
       teacherName: profile.name.isNotEmpty ? profile.name : state.teacherName,
       teacherSchool:
           profile.school.isNotEmpty ? profile.school : state.teacherSchool,
+      teacherSubject:
+          profile.subject.isNotEmpty ? profile.subject : state.teacherSubject,
     );
   }
 
@@ -113,8 +115,9 @@ class SettingsNotifier extends StateNotifier<PreferencesState> {
     await prefs.setBool('darkMode', value);
   }
 
-  void updateProfile({required String name, required String school}) {
-    state = state.copyWith(teacherName: name, teacherSchool: school);
+  Future<void> updateProfile({required String name}) async {
+    state = state.copyWith(teacherName: name);
+    await MongoDataService.updateTeacherName(name);
   }
 
   Future<void> loadFromStorage() async {
