@@ -5,6 +5,8 @@ import '../../app/theme/app_colors.dart';
 import '../../data/mock/mock_data_service.dart';
 import '../../data/models/analytics_models.dart';
 import '../../data/models/observation_model.dart';
+import '../../data/models/student_model.dart';
+import '../dashboard/providers/dashboard_provider.dart';
 import 'providers/student_profile_provider.dart';
 import 'widgets/student_profile_widgets.dart';
 
@@ -21,6 +23,29 @@ class StudentProfileScreen extends ConsumerWidget {
     'Lateness',
     'Teamwork',
   ];
+
+  void _showOptionsMenu(BuildContext context, WidgetRef ref, String currentName) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _EditNameSheet(
+        currentName: currentName,
+        onSave: (newName) {
+          final updated = StudentModel(
+            id: studentId,
+            name: newName,
+            status: 'engaged',
+            classCode: ref
+                .read(studentProfileProvider(studentId))
+                .profile
+                .className,
+          );
+          ref.read(dashboardProvider.notifier).editStudent(studentId, updated);
+        },
+      ),
+    );
+  }
 
   void _showFullHistory(BuildContext context, String name) {
     final history = MockDataService.getStudentSessionHistory(studentId);
@@ -81,7 +106,7 @@ class StudentProfileScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.more_horiz),
-            onPressed: () {},
+            onPressed: () => _showOptionsMenu(context, ref, profile.name),
           ),
         ],
       ),
@@ -420,6 +445,119 @@ class _StudentHistorySheet extends StatelessWidget {
                     ),
                   );
                 },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Edit Name bottom sheet — opened from 3-dots menu
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _EditNameSheet extends StatefulWidget {
+  final String currentName;
+  final void Function(String name) onSave;
+
+  const _EditNameSheet({required this.currentName, required this.onSave});
+
+  @override
+  State<_EditNameSheet> createState() => _EditNameSheetState();
+}
+
+class _EditNameSheetState extends State<_EditNameSheet> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.currentName);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final name = _controller.text.trim();
+    if (name.isEmpty) return;
+    widget.onSave(name);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.colorCard,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.colorBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Edit Student Name',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: context.colorOnCard,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                labelText: 'Name',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                      const BorderSide(color: AppColors.primaryGreen),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 12),
+              ),
+              onSubmitted: (_) => _save(),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text(
+                  'Save',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
             ),
           ],

@@ -32,7 +32,9 @@ class ClassesState {
   final List<StudentWithClass> allStudents;
   final ClassesTab activeTab;
   final String searchQuery;
-  final String? statusFilter; // null = show all
+  final String? statusFilter;
+  final String? subjectFilter;
+  final String? classroomFilter;
   final bool isLoading;
 
   const ClassesState({
@@ -41,6 +43,8 @@ class ClassesState {
     this.activeTab = ClassesTab.periods,
     this.searchQuery = '',
     this.statusFilter,
+    this.subjectFilter,
+    this.classroomFilter,
     this.isLoading = false,
   });
 
@@ -81,6 +85,18 @@ class ClassesState {
       list = list.where((sw) => sw.student.status == statusFilter).toList();
     }
 
+    if (subjectFilter != null) {
+      final codesWithSubject = classes
+          .where((c) => c.subject == subjectFilter)
+          .map((c) => c.code)
+          .toSet();
+      list = list.where((sw) => codesWithSubject.contains(sw.classCode)).toList();
+    }
+
+    if (classroomFilter != null) {
+      list = list.where((sw) => sw.classCode == classroomFilter).toList();
+    }
+
     return List.of(list)
       ..sort((a, b) =>
           (_attentionOrder[a.student.status] ?? 3)
@@ -93,7 +109,11 @@ class ClassesState {
     ClassesTab? activeTab,
     String? searchQuery,
     String? statusFilter,
+    String? subjectFilter,
+    String? classroomFilter,
     bool clearStatusFilter = false,
+    bool clearSubjectFilter = false,
+    bool clearClassroomFilter = false,
     bool? isLoading,
   }) =>
       ClassesState(
@@ -103,6 +123,11 @@ class ClassesState {
         searchQuery: searchQuery ?? this.searchQuery,
         statusFilter:
             clearStatusFilter ? null : (statusFilter ?? this.statusFilter),
+        subjectFilter:
+            clearSubjectFilter ? null : (subjectFilter ?? this.subjectFilter),
+        classroomFilter: clearClassroomFilter
+            ? null
+            : (classroomFilter ?? this.classroomFilter),
         isLoading: isLoading ?? this.isLoading,
       );
 }
@@ -221,13 +246,29 @@ class ClassesNotifier extends StateNotifier<ClassesState> {
         .toList();
   }
 
-  void setTab(ClassesTab tab) =>
-      state = state.copyWith(activeTab: tab, clearStatusFilter: true);
+  void setTab(ClassesTab tab) => state = state.copyWith(
+        activeTab: tab,
+        clearStatusFilter: true,
+        clearSubjectFilter: true,
+        clearClassroomFilter: true,
+      );
 
   void search(String query) => state = state.copyWith(searchQuery: query);
 
-  void setStatusFilter(String? filter) =>
-      state = state.copyWith(clearStatusFilter: filter == null, statusFilter: filter);
+  void setStatusFilter(String? filter) => state = state.copyWith(
+        clearStatusFilter: filter == null,
+        statusFilter: filter,
+      );
+
+  void setSubjectFilter(String? filter) => state = state.copyWith(
+        clearSubjectFilter: filter == null,
+        subjectFilter: filter,
+      );
+
+  void setClassroomFilter(String? filter) => state = state.copyWith(
+        clearClassroomFilter: filter == null,
+        classroomFilter: filter,
+      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

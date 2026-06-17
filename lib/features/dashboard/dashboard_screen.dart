@@ -10,7 +10,7 @@ import 'providers/dashboard_provider.dart';
 import '../classes/providers/classes_provider.dart';
 import 'widgets/live_session_card.dart';
 import 'widgets/class_selector_row.dart';
-import 'widgets/class_roster_section.dart';
+import 'widgets/weekly_schedule_section.dart';
 
 String _currentPeriod() {
   final now = DateTime.now();
@@ -123,17 +123,8 @@ class DashboardScreen extends ConsumerWidget {
 
                       const SizedBox(height: 24),
 
-                      // ── Class Roster ───────────────────────────────────────────────
-                      ClassRosterSection(
-                        students: state.roster,
-                        onlineCount: state.roster
-                            .where((s) => s.status == 'engaged')
-                            .length,
-                        onStudentTap: (student) =>
-                            context.push('/students/${student.id}'),
-                        onStudentEdited: (updated) =>
-                            notifier.editStudent(updated.id, updated),
-                      ),
+                      // ── Weekly Schedule ────────────────────────────────────────────
+                      WeeklyScheduleSection(schedules: state.schedules),
 
                       const SizedBox(height: 20),
 

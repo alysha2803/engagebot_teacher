@@ -25,6 +25,7 @@ class DashboardState {
   final int selectedClassIndex;
   final List<StudentModel> roster;
   final Map<String, dynamic> aiRecommendation;
+  final List<Map<String, dynamic>> schedules;
   final bool isLoading;
   // True after the first successful API fetch — distinguishes "API returned
   // empty" from "still waiting for the first response".
@@ -36,6 +37,7 @@ class DashboardState {
     required this.selectedClassIndex,
     required this.roster,
     required this.aiRecommendation,
+    this.schedules = const [],
     this.isLoading = false,
     this.hasLoadedFromApi = false,
   });
@@ -46,6 +48,7 @@ class DashboardState {
     int? selectedClassIndex,
     List<StudentModel>? roster,
     Map<String, dynamic>? aiRecommendation,
+    List<Map<String, dynamic>>? schedules,
     bool? isLoading,
     bool? hasLoadedFromApi,
   }) =>
@@ -55,6 +58,7 @@ class DashboardState {
         selectedClassIndex: selectedClassIndex ?? this.selectedClassIndex,
         roster: roster ?? this.roster,
         aiRecommendation: aiRecommendation ?? this.aiRecommendation,
+        schedules: schedules ?? this.schedules,
         isLoading: isLoading ?? this.isLoading,
         hasLoadedFromApi: hasLoadedFromApi ?? this.hasLoadedFromApi,
       );
@@ -111,12 +115,16 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
     return baseRoster.map((s) => edits[s.id] ?? s).toList();
   }
 
-  /// Pull classes, roster, and live session data from the API.
+  /// Pull classes, roster, live session, and schedule data from the API.
   Future<void> refreshFromFirebase(String teacherId) async {
     if (!mounted) return;
     state = state.copyWith(isLoading: true);
 
-    final classes = await MongoDataService.getClasses(teacherId);
+    final classesFuture = MongoDataService.getClasses(teacherId);
+    final schedulesFuture = MongoDataService.getSchedules(teacherId);
+
+    final classes = await classesFuture;
+    final schedules = await schedulesFuture;
     if (!mounted) return;
 
     final classCode = classes.isNotEmpty ? classes[0].code : '';
@@ -132,6 +140,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 
     state = state.copyWith(
       classes: classes,
+      schedules: schedules,
       roster: _applyEdits(roster),
       selectedClassIndex: 0,
       liveEngagement:

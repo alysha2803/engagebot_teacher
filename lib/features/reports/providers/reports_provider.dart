@@ -2,11 +2,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/export_history_model.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Report type enum
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ReportType { overall, classroom, subject }
+
+// ─────────────────────────────────────────────────────────────────────────────
 // State
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ReportsState {
-  final String selectedClass;
+  final ReportType reportType;
+  final String selectedClass;   // used when reportType == classroom
+  final String selectedSubject; // used when reportType == subject
   final String dateRange;
   final List<ExportHistoryModel> allHistory;
   final bool showAllHistory;
@@ -14,7 +22,9 @@ class ReportsState {
   final bool isLoading;
 
   const ReportsState({
-    required this.selectedClass,
+    this.reportType = ReportType.overall,
+    this.selectedClass = '',
+    this.selectedSubject = '',
     required this.dateRange,
     required this.allHistory,
     this.showAllHistory = false,
@@ -22,12 +32,26 @@ class ReportsState {
     this.isLoading = false,
   });
 
+  /// Human-readable summary of the current scope selection.
+  String get scopeLabel {
+    switch (reportType) {
+      case ReportType.overall:
+        return 'Overall (All Classes)';
+      case ReportType.classroom:
+        return selectedClass.isEmpty ? 'Select classroom' : selectedClass;
+      case ReportType.subject:
+        return selectedSubject.isEmpty ? 'Select subject' : selectedSubject;
+    }
+  }
+
   /// Shows up to 3 items unless expanded.
   List<ExportHistoryModel> get visibleHistory =>
       showAllHistory ? allHistory : allHistory.take(3).toList();
 
   ReportsState copyWith({
+    ReportType? reportType,
     String? selectedClass,
+    String? selectedSubject,
     String? dateRange,
     List<ExportHistoryModel>? allHistory,
     bool? showAllHistory,
@@ -35,7 +59,9 @@ class ReportsState {
     bool? isLoading,
   }) =>
       ReportsState(
+        reportType: reportType ?? this.reportType,
         selectedClass: selectedClass ?? this.selectedClass,
+        selectedSubject: selectedSubject ?? this.selectedSubject,
         dateRange: dateRange ?? this.dateRange,
         allHistory: allHistory ?? this.allHistory,
         showAllHistory: showAllHistory ?? this.showAllHistory,
@@ -51,13 +77,18 @@ class ReportsState {
 class ReportsNotifier extends StateNotifier<ReportsState> {
   ReportsNotifier()
       : super(const ReportsState(
-          selectedClass: '',
           dateRange: 'Last 7 Days',
           allHistory: [],
         ));
 
+  void selectReportType(ReportType type) =>
+      state = state.copyWith(reportType: type);
+
   void selectClass(String classDisplay) =>
       state = state.copyWith(selectedClass: classDisplay);
+
+  void selectSubject(String subject) =>
+      state = state.copyWith(selectedSubject: subject);
 
   void selectDateRange(String range) =>
       state = state.copyWith(dateRange: range);
@@ -70,17 +101,19 @@ class ReportsNotifier extends StateNotifier<ReportsState> {
     state = state.copyWith(isGenerating: true);
     await Future.delayed(const Duration(milliseconds: 1800));
 
-    final classCode = state.selectedClass.isEmpty
-        ? 'Class'
-        : state.selectedClass
-            .split(' : ')
-            .first
-            .trim()
-            .replaceAll(' ', '_');
+    final scopeSlug = switch (state.reportType) {
+      ReportType.overall => 'Overall',
+      ReportType.classroom => state.selectedClass.isEmpty
+          ? 'Class'
+          : state.selectedClass.replaceAll(' ', '_'),
+      ReportType.subject => state.selectedSubject.isEmpty
+          ? 'Subject'
+          : state.selectedSubject.replaceAll(' ', '_'),
+    };
 
     final newExport = ExportHistoryModel(
       type: type,
-      name: '${classCode}_${type}_Report',
+      name: '${scopeSlug}_${type}_Report',
       date: 'Today',
       size: type == 'PDF' ? '1.8 MB' : '315 KB',
     );

@@ -49,6 +49,18 @@ abstract final class MongoDataService {
     await ApiService.updateMyProfile({'name': name.trim()});
   }
 
+  // ── Raw schedule list (for weekly schedule view) ──────────────────────────
+
+  static Future<List<Map<String, dynamic>>> getSchedules(String teacherId) =>
+      _withFallback(
+        () async {
+          if (teacherId.isEmpty) return null;
+          final raw = await ApiService.getSchedules(teacherId: teacherId);
+          return raw.cast<Map<String, dynamic>>();
+        },
+        () => <Map<String, dynamic>>[],
+      );
+
   // ── Class list ─────────────────────────────────────────────────────────────
 
   static Future<List<ClassModel>> getClasses(String teacherId) =>

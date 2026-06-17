@@ -35,9 +35,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     }
   }
 
-  // ── Class picker ─────────────────────────────────────────────────────────
+  // ── Classroom picker ─────────────────────────────────────────────────────
 
-  void _showClassPicker() {
+  void _showClassroomPicker() {
     final classes = ref.read(dashboardProvider).classes;
     final current = ref.read(reportsProvider).selectedClass;
 
@@ -45,7 +45,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => _BottomSheet(
-        title: 'Select Class',
+        title: 'Select Classroom',
         child: classes.isEmpty
             ? const Padding(
                 padding: EdgeInsets.symmetric(vertical: 16),
@@ -56,12 +56,73 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               )
             : Column(
                 children: classes.map((cls) {
-                  final label = '${cls.code} : ${cls.subject}';
-                  final selected = label == current;
+                  final selected = cls.code == current;
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(
-                      label,
+                      cls.code,
+                      style: TextStyle(
+                        fontWeight:
+                            selected ? FontWeight.w600 : FontWeight.normal,
+                        color: selected
+                            ? AppColors.primaryGreen
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      cls.subject,
+                      style:
+                          const TextStyle(color: AppColors.textSecondary),
+                    ),
+                    trailing: selected
+                        ? const Icon(Icons.check,
+                            color: AppColors.primaryGreen, size: 18)
+                        : null,
+                    onTap: () {
+                      ref
+                          .read(reportsProvider.notifier)
+                          .selectClass(cls.code);
+                      Navigator.pop(context);
+                    },
+                  );
+                }).toList(),
+              ),
+      ),
+    );
+  }
+
+  // ── Subject picker ───────────────────────────────────────────────────────
+
+  void _showSubjectPicker() {
+    final classes = ref.read(dashboardProvider).classes;
+    final current = ref.read(reportsProvider).selectedSubject;
+    final subjects = classes
+        .map((c) => c.subject)
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _BottomSheet(
+        title: 'Select Subject',
+        child: subjects.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'No subjects found.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              )
+            : Column(
+                children: subjects.map((s) {
+                  final selected = s == current;
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      s,
                       style: TextStyle(
                         fontWeight:
                             selected ? FontWeight.w600 : FontWeight.normal,
@@ -75,7 +136,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                             color: AppColors.primaryGreen, size: 18)
                         : null,
                     onTap: () {
-                      ref.read(reportsProvider.notifier).selectClass(label);
+                      ref
+                          .read(reportsProvider.notifier)
+                          .selectSubject(s);
                       Navigator.pop(context);
                     },
                   );
@@ -195,9 +258,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              ref.read(reportsProvider).selectedClass.isEmpty
-                  ? 'All Classes'
-                  : ref.read(reportsProvider).selectedClass,
+              ref.read(reportsProvider).scopeLabel,
               style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -331,23 +392,60 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Class selector
+                  // Report type selector
                   const Text(
-                    'Active Class Session',
+                    'Report Type',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textMuted,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  _FilterRow(
-                    icon: Icons.group_outlined,
-                    label: state.selectedClass.isEmpty
-                        ? 'Select a class'
-                        : state.selectedClass,
-                    onTap: _showClassPicker,
+                  const SizedBox(height: 8),
+                  _ReportTypeSelector(
+                    selected: state.reportType,
+                    onSelect: notifier.selectReportType,
                   ),
+
+                  // Conditional scope picker
+                  if (state.reportType == ReportType.classroom) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Classroom',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    _FilterRow(
+                      icon: Icons.class_outlined,
+                      label: state.selectedClass.isEmpty
+                          ? 'Select a classroom'
+                          : state.selectedClass,
+                      onTap: _showClassroomPicker,
+                    ),
+                  ] else if (state.reportType == ReportType.subject) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Subject',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    _FilterRow(
+                      icon: Icons.book_outlined,
+                      label: state.selectedSubject.isEmpty
+                          ? 'Select a subject'
+                          : state.selectedSubject,
+                      onTap: _showSubjectPicker,
+                    ),
+                  ],
+
                   const SizedBox(height: 12),
                   const Divider(height: 1, color: AppColors.borderLight),
                   const SizedBox(height: 12),
@@ -675,6 +773,87 @@ class _ExportCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Report type selector — three tappable options in a row
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ReportTypeSelector extends StatelessWidget {
+  final ReportType selected;
+  final void Function(ReportType) onSelect;
+
+  const _ReportTypeSelector({
+    required this.selected,
+    required this.onSelect,
+  });
+
+  static const _options = [
+    (ReportType.overall, Icons.bar_chart_outlined, 'Overall'),
+    (ReportType.classroom, Icons.class_outlined, 'By Classroom'),
+    (ReportType.subject, Icons.book_outlined, 'By Subject'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: _options.map((opt) {
+        final (type, icon, label) = opt;
+        final isSelected = selected == type;
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(
+              right: type != ReportType.subject ? 8 : 0,
+            ),
+            child: GestureDetector(
+              onTap: () => onSelect(type),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.primaryGreen
+                      : AppColors.backgroundLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected
+                        ? AppColors.primaryGreen
+                        : AppColors.borderLight,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      icon,
+                      size: 18,
+                      color: isSelected
+                          ? Colors.white
+                          : AppColors.textSecondary,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.normal,
+                        color: isSelected
+                            ? Colors.white
+                            : AppColors.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

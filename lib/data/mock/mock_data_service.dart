@@ -219,8 +219,7 @@ abstract final class MockDataService {
       'flags': 2,
       'focusDepth': 92,
       'collaboration': 45,
-      'droidInsight':
-          "$name's engagement dropped by 30% during independent reading. Try initiating a 1-on-1 concept check to re-focus.",
+      'droidInsight': 'No droid data available yet for this student.',
       'timeline': [
         {'time': '09:00', 'value': 70.0},
         {'time': '09:15', 'value': 80.0},
