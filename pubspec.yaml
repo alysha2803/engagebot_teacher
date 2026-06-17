@@ -16,19 +16,13 @@ dependencies:
   # Navigation
   go_router: ^13.0.0
 
-  # Firebase
-  firebase_core: ^3.6.0
-  firebase_auth: ^5.3.1
-  cloud_firestore: ^5.4.3
-  google_sign_in: ^6.2.0
-
-  # HTTP
+  # HTTP client (used by ApiService)
   dio: ^5.4.0
 
   # Charts
   fl_chart: ^0.68.0
 
-  # Local storage
+  # Local storage (settings + JWT token)
   shared_preferences: ^2.2.3
 
   # Images

@@ -31,7 +31,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final isLoading = authState.status == AuthStatus.loading;
-    final topH = MediaQuery.of(context).size.height * 0.43;
+    final topH = MediaQuery.of(context).size.height * 0.38;
 
     return Scaffold(
       backgroundColor: _kSage,
@@ -95,24 +95,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Access your teacher dashboard.',
+                      'Use the credentials provided by your school admin.',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black.withValues(alpha: 0.45),
                       ),
                     ),
-                    const SizedBox(height: 24),
-
-                    // ── Google button ──────────────────────────────────────
-                    _GoogleSignInButton(
-                      isLoading: isLoading,
-                      onTap: () =>
-                          ref.read(authProvider.notifier).signInWithGoogle(),
-                    ),
-
-                    const SizedBox(height: 20),
-                    const _OrDivider(),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 28),
 
                     // ── Email field ────────────────────────────────────────
                     _PillInputField(
@@ -210,101 +199,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Google Sign-In button
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _GoogleSignInButton extends StatelessWidget {
-  final bool isLoading;
-  final VoidCallback onTap;
-
-  const _GoogleSignInButton({required this.isLoading, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 54,
-      child: OutlinedButton(
-        onPressed: isLoading ? null : onTap,
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Color(0xFFD8E6CE), width: 1.5),
-          shape: const StadiumBorder(),
-          backgroundColor: const Color(0xFFF6FAF3),
-          foregroundColor: _kTitleColor,
-          elevation: 0,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: CustomPaint(painter: _GPainter()),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Continue with Google',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: _kTitleColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Simple 4-quadrant Google "G" painted without assets.
-class _GPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final r = size.width / 2;
-    final paints = [
-      Paint()..color = const Color(0xFF4285F4)..style = PaintingStyle.fill,
-      Paint()..color = const Color(0xFFEA4335)..style = PaintingStyle.fill,
-      Paint()..color = const Color(0xFFFBBC05)..style = PaintingStyle.fill,
-      Paint()..color = const Color(0xFF34A853)..style = PaintingStyle.fill,
-    ];
-    final c = Offset(r, r);
-    canvas.drawArc(Rect.fromCircle(center: c, radius: r), 3.14, 1.57, true, paints[1]);
-    canvas.drawArc(Rect.fromCircle(center: c, radius: r), 4.71, 1.57, true, paints[0]);
-    canvas.drawArc(Rect.fromCircle(center: c, radius: r), 0.00, 1.57, true, paints[3]);
-    canvas.drawArc(Rect.fromCircle(center: c, radius: r), 1.57, 1.57, true, paints[2]);
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// "or sign in with email" divider
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _OrDivider extends StatelessWidget {
-  const _OrDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Expanded(child: Divider(color: Color(0xFFE2EDD9))),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            'or sign in with email',
-            style: TextStyle(
-                fontSize: 12, color: Colors.black.withValues(alpha: 0.38)),
-          ),
-        ),
-        const Expanded(child: Divider(color: Color(0xFFE2EDD9))),
-      ],
     );
   }
 }

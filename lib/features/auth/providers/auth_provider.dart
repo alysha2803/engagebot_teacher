@@ -1,7 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import '../../../data/services/api_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // State
@@ -11,7 +10,7 @@ enum AuthStatus { initial, loading, authenticated, notRegistered, unauthenticate
 
 class AuthState {
   final AuthStatus status;
-  final String? teacherId; // Firestore teachers/{teacherId}
+  final String? teacherId;
   final String? email;
   final String? errorMessage;
 
@@ -22,18 +21,13 @@ class AuthState {
     this.errorMessage,
   });
 
-  factory AuthState.initial() =>
-      const AuthState._(status: AuthStatus.initial);
-  factory AuthState.loading() =>
-      const AuthState._(status: AuthStatus.loading);
+  factory AuthState.initial() => const AuthState._(status: AuthStatus.initial);
+  factory AuthState.loading() => const AuthState._(status: AuthStatus.loading);
   factory AuthState.authenticated(String teacherId, String email) =>
       AuthState._(status: AuthStatus.authenticated, teacherId: teacherId, email: email);
-  factory AuthState.notRegistered() =>
-      const AuthState._(status: AuthStatus.notRegistered);
-  factory AuthState.unauthenticated() =>
-      const AuthState._(status: AuthStatus.unauthenticated);
-  factory AuthState.error(String msg) =>
-      AuthState._(status: AuthStatus.error, errorMessage: msg);
+  factory AuthState.notRegistered() => const AuthState._(status: AuthStatus.notRegistered);
+  factory AuthState.unauthenticated() => const AuthState._(status: AuthStatus.unauthenticated);
+  factory AuthState.error(String msg) => AuthState._(status: AuthStatus.error, errorMessage: msg);
 
   bool get isAuthenticated => status == AuthStatus.authenticated;
 }
@@ -47,147 +41,71 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _restoreSession();
   }
 
-  // Check whether the user is already signed in from a previous session.
+  // On app launch: check whether a saved JWT is still valid by calling /auth/me.
   Future<void> _restoreSession() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
+    final token = await ApiService.getToken();
+    if (token == null) {
       state = AuthState.unauthenticated();
       return;
     }
     try {
-      final doc = await FirebaseFirestore.instance
-          .doc('users/${user.uid}')
-          .get()
-          .timeout(const Duration(seconds: 5));
-      final teacherId = doc.data()?['teacherId'] as String?;
-      if (teacherId != null && teacherId.isNotEmpty) {
-        state = AuthState.authenticated(teacherId, user.email ?? '');
-      } else {
-        // Auth token exists but no Firestore user record — sign out cleanly.
-        await FirebaseAuth.instance.signOut();
+      final profile = await ApiService.getMyProfile();
+      final teacherId = (profile['id'] ?? profile['_id'] ?? '').toString();
+      final email = (profile['email'] ?? '').toString();
+      state = AuthState.authenticated(teacherId, email);
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      if (statusCode == 401 || statusCode == 403) {
+        // Token expired — clear it and send to login.
+        await ApiService.clearToken();
         state = AuthState.unauthenticated();
+      } else {
+        // Network error — keep authenticated with empty id so mock data is used.
+        state = AuthState.authenticated('', '');
       }
     } catch (_) {
-      // Firestore unavailable (offline / first launch with no network).
-      // Keep the user "in" with an empty teacherId so mock data is used.
-      state = AuthState.authenticated('', user.email ?? '');
+      state = AuthState.authenticated('', '');
     }
   }
 
-  // ── Sign in ───────────────────────────────────────────────────────────────
+  // ── Sign in ────────────────────────────────────────────────────────────────
 
-  static final _googleSignIn = GoogleSignIn();
-
-  Future<void> signInWithGoogle() async {
+  Future<void> signInWithEmailAndPassword(String email, String password) async {
     state = AuthState.loading();
     try {
-      // Use the native Google Sign-In SDK — more reliable on Android than
-      // signInWithProvider which needs browser redirect URI configuration.
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        // User cancelled the picker.
-        state = AuthState.unauthenticated();
-        return;
-      }
-
-      final googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final userCredential =
-          await FirebaseAuth.instance.signInWithCredential(credential);
-      final user = userCredential.user!;
-      final email = user.email!.toLowerCase();
-
-      // Check whether this Google account belongs to a registered teacher.
-      final snap = await FirebaseFirestore.instance
-          .collection('teachers')
-          .where('email', isEqualTo: email)
-          .limit(1)
-          .get();
-
-      if (snap.docs.isEmpty) {
-        await FirebaseAuth.instance.signOut();
-        await _googleSignIn.signOut();
-        state = AuthState.notRegistered();
-        return;
-      }
-
-      final doc = snap.docs.first;
-      await doc.reference.update({'authUid': user.uid});
-      await FirebaseFirestore.instance.doc('users/${user.uid}').set(
-        {'teacherId': doc.id, 'role': 'teacher', 'email': email},
-        SetOptions(merge: true),
-      );
-
-      state = AuthState.authenticated(doc.id, email);
-    } on FirebaseAuthException catch (e) {
-      state = AuthState.error(e.message ?? 'Authentication failed');
-    } catch (_) {
+      final data = await ApiService.loginTeacher(email, password);
+      final teacher = data['teacher'] as Map<String, dynamic>;
+      final teacherId = (teacher['id'] ?? teacher['_id'] ?? '').toString();
+      final teacherEmail = (teacher['email'] ?? email).toString();
+      state = AuthState.authenticated(teacherId, teacherEmail);
+    } on DioException catch (e) {
+      final msg = e.error is ApiException
+          ? (e.error as ApiException).message
+          : e.message ?? 'Sign-in failed';
+      state = AuthState.error(_mapError(msg));
+    } catch (e) {
       state = AuthState.error('Sign-in failed. Please try again.');
     }
   }
 
-  // ── Email / password sign in ──────────────────────────────────────────────
-
-  Future<void> signInWithEmailAndPassword(
-      String email, String password) async {
-    state = AuthState.loading();
-    try {
-      final credential = await FirebaseAuth.instance
-          .signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
-      final user = credential.user!;
-
-      final doc = await FirebaseFirestore.instance
-          .doc('users/${user.uid}')
-          .get()
-          .timeout(const Duration(seconds: 6));
-
-      final teacherId = doc.data()?['teacherId'] as String?;
-      if (teacherId != null && teacherId.isNotEmpty) {
-        state = AuthState.authenticated(teacherId, user.email ?? '');
-      } else {
-        // Auth account exists but no teacher record — admin hasn't registered them.
-        await FirebaseAuth.instance.signOut();
-        state = AuthState.notRegistered();
-      }
-    } on FirebaseAuthException catch (e) {
-      state = AuthState.error(_emailError(e.code));
-    } catch (_) {
-      // Firestore unreachable — keep user signed in with mock data fallback.
-      if (FirebaseAuth.instance.currentUser != null) {
-        state = AuthState.authenticated(
-            '', FirebaseAuth.instance.currentUser!.email ?? '');
-      } else {
-        state = AuthState.error('Sign-in failed. Please try again.');
-      }
+  static String _mapError(String msg) {
+    final lower = msg.toLowerCase();
+    if (lower.contains('incorrect') || lower.contains('invalid')) {
+      return 'Incorrect email or password.';
     }
+    if (lower.contains('deactivated') || lower.contains('disabled')) {
+      return 'This account has been deactivated. Contact your admin.';
+    }
+    if (lower.contains('network') || lower.contains('connect')) {
+      return 'No internet connection.';
+    }
+    return msg;
   }
 
-  static String _emailError(String code) => switch (code) {
-        'user-not-found' ||
-        'wrong-password' ||
-        'invalid-credential' ||
-        'INVALID_LOGIN_CREDENTIALS' =>
-          'Incorrect email or password.',
-        'user-disabled' => 'This account has been disabled.',
-        'too-many-requests' => 'Too many attempts. Please try again later.',
-        'network-request-failed' => 'No internet connection.',
-        _ => 'Sign-in failed. Please try again.',
-      };
-
-  // ── Sign out ──────────────────────────────────────────────────────────────
+  // ── Sign out ───────────────────────────────────────────────────────────────
 
   Future<void> signOut() async {
-    try {
-      await _googleSignIn.signOut(); // clears the cached Google account token
-    } catch (_) {}
-    await FirebaseAuth.instance.signOut();
+    await ApiService.logout();
     state = AuthState.unauthenticated();
   }
 }
@@ -200,10 +118,8 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>(
   (ref) => AuthNotifier(),
 );
 
-/// Derives the current teacher's Firestore document ID from auth state.
-/// Other providers (dashboard, settings) watch this to trigger Firebase refreshes.
-/// Null means "not authenticated" — use mock data only.
-/// Empty string means "authenticated but Firestore unreachable" — use mock data.
+/// The current teacher's MongoDB _id as a string.
+/// Null = not authenticated. Empty string = authenticated but API unreachable.
 final currentTeacherIdProvider = Provider<String?>((ref) {
   return ref.watch(authProvider).teacherId;
 });
