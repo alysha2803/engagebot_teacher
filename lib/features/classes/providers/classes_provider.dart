@@ -133,10 +133,18 @@ class ClassesNotifier extends StateNotifier<ClassesState> {
       if (teacherId.isNotEmpty) refreshFromFirebase(teacherId);
     });
 
-    // Keep the student list in sync whenever a name/status is edited.
+    // Apply edits on top of the current (real or mock) student list.
     _ref.listen<Map<String, StudentModel>>(
       studentEditsProvider,
-      (_, __) => state = state.copyWith(allStudents: _buildAllStudents()),
+      (_, edits) {
+        final updated = state.allStudents.map((sw) {
+          final edit = edits[sw.student.id];
+          return edit != null
+              ? StudentWithClass(student: edit, classCode: sw.classCode)
+              : sw;
+        }).toList();
+        state = state.copyWith(allStudents: updated);
+      },
     );
 
     // Kick off a Firebase refresh if the teacher is already signed in.

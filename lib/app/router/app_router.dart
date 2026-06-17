@@ -1,5 +1,3 @@
-import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/splash_screen.dart';
@@ -25,35 +23,30 @@ abstract final class AppRoutes {
 }
 
 /// Builds and returns the GoRouter for the app.
-GoRouter buildAppRouter() {
+/// [refreshNotifier] is notified whenever the auth state changes so the
+/// redirect guard re-evaluates. [isLoggedIn] is a callback that reads the
+/// current auth state from Riverpod without needing a BuildContext here.
+GoRouter buildAppRouter(
+  ChangeNotifier refreshNotifier,
+  bool Function() isLoggedIn,
+) {
   return GoRouter(
     initialLocation: AppRoutes.splash,
-
-    // Re-evaluate redirect whenever Firebase auth state changes.
-    refreshListenable: _AuthStateNotifier(),
-
-    // Auth guard: redirect unauthenticated users to /login,
-    // and skip /login for already-authenticated users.
-    // /splash is exempt — it reads auth state itself and navigates when ready.
+    refreshListenable: refreshNotifier,
     redirect: (context, state) {
       final loc = state.matchedLocation;
       if (loc == AppRoutes.splash) return null;
-      final isLoggedIn = FirebaseAuth.instance.currentUser != null;
-      if (!isLoggedIn && loc != AppRoutes.login) return AppRoutes.login;
-      if (isLoggedIn && loc == AppRoutes.login) return AppRoutes.dashboard;
+      final loggedIn = isLoggedIn();
+      if (!loggedIn && loc != AppRoutes.login) return AppRoutes.login;
+      if (loggedIn && loc == AppRoutes.login) return AppRoutes.dashboard;
       return null;
     },
-
     routes: [
-      // ── Splash — shown once on app launch ──────────────────────────────
       GoRoute(
         path: AppRoutes.splash,
         name: 'splash',
         builder: (context, state) => const SplashScreen(),
       ),
-
-      // ── Auth — standalone, no shell ────────────────────────────────────
-      // Slides up from the bottom when navigated from splash.
       GoRoute(
         path: AppRoutes.login,
         name: 'login',
@@ -62,30 +55,20 @@ GoRouter buildAppRouter() {
           child: const LoginScreen(),
           transitionDuration: const Duration(milliseconds: 600),
           reverseTransitionDuration: const Duration(milliseconds: 400),
-          transitionsBuilder: (context, animation, _, child) {
-            return FadeTransition(
-              opacity: CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeInOut,
-              ),
-              child: child,
-            );
-          },
+          transitionsBuilder: (context, animation, _, child) => FadeTransition(
+            opacity: CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+            child: child,
+          ),
         ),
       ),
-
-      // ── Class Analytics — no bottom nav ────────────────────────────────
       GoRoute(
         path: AppRoutes.classDetail,
         name: 'classDetail',
         builder: (context, state) {
-          final classCode =
-              Uri.decodeComponent(state.pathParameters['classCode'] ?? '');
+          final classCode = Uri.decodeComponent(state.pathParameters['classCode'] ?? '');
           return ClassAnalyticsScreen(classCode: classCode);
         },
       ),
-
-      // ── Student Profile — no bottom nav ────────────────────────────────
       GoRoute(
         path: AppRoutes.studentProfile,
         name: 'studentProfile',
@@ -94,52 +77,20 @@ GoRouter buildAppRouter() {
           return StudentProfileScreen(studentId: studentId);
         },
       ),
-
-      // ── Main shell with bottom navigation ──────────────────────────────
       ShellRoute(
         builder: (context, state, child) => EngagebotScaffold(child: child),
         routes: [
-          GoRoute(
-            path: AppRoutes.dashboard,
-            name: 'dashboard',
-            builder: (context, state) => const DashboardScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.classes,
-            name: 'classes',
-            builder: (context, state) => const ClassesScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.reports,
-            name: 'reports',
-            builder: (context, state) => const ReportsScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.recommendations,
-            name: 'recommendations',
-            builder: (context, state) => const AIRecommendationScreen(),
-          ),
+          GoRoute(path: AppRoutes.dashboard, name: 'dashboard', builder: (_, __) => const DashboardScreen()),
+          GoRoute(path: AppRoutes.classes, name: 'classes', builder: (_, __) => const ClassesScreen()),
+          GoRoute(path: AppRoutes.reports, name: 'reports', builder: (_, __) => const ReportsScreen()),
+          GoRoute(path: AppRoutes.recommendations, name: 'recommendations', builder: (_, __) => const AIRecommendationScreen()),
         ],
       ),
     ],
   );
 }
 
-/// Notifies GoRouter whenever the Firebase auth state changes so the
-/// redirect function is re-evaluated (sign-in → goes to /dashboard,
-/// sign-out → goes to /login).
-class _AuthStateNotifier extends ChangeNotifier {
-  late final StreamSubscription<User?> _sub;
-
-  _AuthStateNotifier() {
-    _sub = FirebaseAuth.instance
-        .authStateChanges()
-        .listen((_) => notifyListeners());
-  }
-
-  @override
-  void dispose() {
-    _sub.cancel();
-    super.dispose();
-  }
+/// Wraps a simple notify() so Riverpod can tell GoRouter when auth state changes.
+class AppAuthNotifier extends ChangeNotifier {
+  void notify() => notifyListeners();
 }

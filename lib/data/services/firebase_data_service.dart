@@ -1,25 +1,13 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dio/dio.dart';
 import '../mock/mock_data_service.dart';
 import '../models/class_model.dart';
 import '../models/student_model.dart';
 import '../models/teacher_profile_model.dart';
+import 'api_service.dart';
 
-// Firestore collection names — match whatever the admin app writes.
-const _kTeachers = 'teachers';
-const _kClasses = 'classes';
-const _kStudents = 'students';
-
-/// Reads data from Firestore.
-/// Every method falls back to the corresponding MockDataService call when:
-///   • the query returns 0 documents
-///   • Firestore is unreachable (network error, permission error, etc.)
-///   • the operation times out (> 6 s)
-///
-/// This means the app always has data to show, even before the admin has
-/// populated the database or when running offline.
+// Renamed from FirebaseDataService — keeps the same public API so all callers
+// work without changes. Data now comes from the REST API instead of Firestore.
 abstract final class FirebaseDataService {
-  static final _db = FirebaseFirestore.instance;
-
   // ── Internal helper ────────────────────────────────────────────────────────
 
   static Future<T> _withFallback<T>(
@@ -27,8 +15,13 @@ abstract final class FirebaseDataService {
     T Function() fallback,
   ) async {
     try {
-      final result = await fetch().timeout(const Duration(seconds: 6));
+      final result = await fetch();
       return result ?? fallback();
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+        rethrow; // Auth errors should propagate, not silently fall back.
+      }
+      return fallback();
     } catch (_) {
       return fallback();
     }
@@ -36,23 +29,15 @@ abstract final class FirebaseDataService {
 
   // ── Teacher profile ────────────────────────────────────────────────────────
 
-  // Firestore document: teachers/{teacherId}
-  //   name      : string
-  //   school    : string   (optional — defaults to mock)
-  //   subject   : string   (optional)
-  //   avatarUrl : string   (optional)
   static Future<TeacherProfileModel> getTeacherProfile(String teacherId) =>
       _withFallback(
         () async {
-          final doc =
-              await _db.collection(_kTeachers).doc(teacherId).get();
-          if (!doc.exists) return null;
-          final d = doc.data()!;
+          final data = await ApiService.getMyProfile();
           return TeacherProfileModel.fromJson({
-            'name': d['name'] ?? '',
-            'school': d['school'] ?? d['schoolName'] ?? '',
-            'subject': d['subject'] ?? '',
-            'avatarUrl': d['avatarUrl'] ?? '',
+            'name': data['name'] ?? '',
+            'school': data['school'] ?? '',
+            'subject': data['department'] ?? data['subject'] ?? '',
+            'avatarUrl': data['avatarUrl'] ?? '',
           });
         },
         MockDataService.getTeacherProfile,
@@ -60,110 +45,186 @@ abstract final class FirebaseDataService {
 
   // ── Class list ─────────────────────────────────────────────────────────────
 
-  // Firestore documents: classes/{classId}
-  //   code         : string   e.g. "1 USAHA"
-  //   subject      : string
-  //   teacherId    : string   (foreign key)
-  //   studentCount : number
-  //   status       : "online" | "offline"
   static Future<List<ClassModel>> getClasses(String teacherId) =>
       _withFallback(
         () async {
-          final snap = await _db
-              .collection(_kClasses)
-              .where('teacherId', isEqualTo: teacherId)
-              .orderBy('code')
-              .get();
-          if (snap.docs.isEmpty) return null;
-          return snap.docs.map((doc) {
-            final d = doc.data();
-            return ClassModel.fromJson({
-              'code': d['code'] ?? doc.id,
-              'subject': d['subject'] ?? '',
-              'students': d['studentCount'] ?? 0,
-              'status': d['status'] ?? 'offline',
-            });
-          }).toList();
+          // Empty teacherId means no auth — use mock so dev mode still works.
+          if (teacherId.isEmpty) return null;
+          final raw = await ApiService.getSchedules(teacherId: teacherId);
+
+          // Deduplicate: one ClassModel per unique classGroup.
+          final seen = <String>{};
+          final classes = <ClassModel>[];
+          for (final s in raw) {
+            final code = s['classGroup'] as String? ?? '';
+            if (code.isEmpty || seen.contains(code)) continue;
+            seen.add(code);
+            classes.add(ClassModel.fromJson({
+              'code': code,
+              'subject': s['subject'] ?? '',
+              'students': 0,
+              'status': s['status'] == 'ongoing' ? 'online' : 'offline',
+            }));
+          }
+          classes.sort((a, b) => a.code.compareTo(b.code));
+          // Return the list even if empty — shows "no classes" instead of mock.
+          return classes;
         },
         () => MockDataService.getClassesForTeacher(teacherId),
       );
 
-  // ── Write — update a student document ────────────────────────────────────
+  // ── Write — update a student ───────────────────────────────────────────────
 
-  // Persists name/status/statusNote edits to Firestore.
-  // Fire-and-forget: callers update the in-memory overlay immediately so the
-  // UI never waits on this write.
   static Future<void> updateStudent(
-      String studentId, StudentModel student) async {
+    String studentId,
+    StudentModel student,
+  ) async {
     try {
-      await _db.collection(_kStudents).doc(studentId).update({
+      await ApiService.updateStudent(studentId, {
         'name': student.name,
         'status': student.status,
         'statusNote': student.statusNote ?? '',
-      }).timeout(const Duration(seconds: 10));
+      });
     } catch (_) {
-      // Silently ignore — studentEditsProvider holds the in-session edit.
+      // Fire-and-forget — the in-memory overlay already updated the UI.
     }
   }
 
-  // ── All students for a teacher (one query) ────────────────────────────────
+  // ── All students for a teacher ─────────────────────────────────────────────
 
-  // Returns every student for the given teacher, each with `classCode` set.
-  // Used by ClassesNotifier to populate the Students tab without N separate
-  // per-class queries.
-  static Future<List<StudentModel>> getAllStudentsForTeacher(
-          String teacherId) =>
+  static Future<List<StudentModel>> getAllStudentsForTeacher(String teacherId) =>
       _withFallback(
         () async {
-          final snap = await _db
-              .collection(_kStudents)
-              .where('teacherId', isEqualTo: teacherId)
-              .get();
-          if (snap.docs.isEmpty) return null;
-          return snap.docs.map((doc) {
-            final d = doc.data();
-            return StudentModel.fromJson({
-              'id': doc.id,
-              'name': d['name'] ?? '',
-              'status': d['status'] ?? 'engaged',
-              'statusNote': d['statusNote'],
-              'classCode': d['classCode'],
-            });
-          }).toList();
+          if (teacherId.isEmpty) return null;
+          final schedules = await ApiService.getSchedules(teacherId: teacherId);
+          final classCodes = schedules
+              .map((s) => s['classGroup'] as String?)
+              .whereType<String>()
+              .toSet();
+          if (classCodes.isEmpty) return [];
+
+          final students = <StudentModel>[];
+          for (final code in classCodes) {
+            final raw = await ApiService.getStudents(classGroup: code);
+            students.addAll(raw.map((d) => StudentModel.fromJson({
+                  'id': (d['id'] ?? d['_id'] ?? '').toString(),
+                  'name': d['name'] ?? '',
+                  'status': d['status'] ?? 'engaged',
+                  'statusNote': d['statusNote'],
+                  'classCode': d['classGroup'] ?? code,
+                })));
+          }
+          return students; // empty list = no students in DB yet
         },
         () => MockDataService.getAllStudentsWithClassForTeacher(teacherId),
       );
 
   // ── Roster for a single class ──────────────────────────────────────────────
 
-  // Firestore documents: students/{studentId}
-  //   name      : string
-  //   classCode : string   matches ClassModel.code
-  //   teacherId : string   (foreign key)
-  //   status    : "engaged" | "distracted" | "flagged"
-  //   statusNote: string   (optional)
   static Future<List<StudentModel>> getRosterForClass(
     String classCode,
     String teacherId,
   ) =>
       _withFallback(
         () async {
-          final snap = await _db
-              .collection(_kStudents)
-              .where('teacherId', isEqualTo: teacherId)
-              .where('classCode', isEqualTo: classCode)
-              .get();
-          if (snap.docs.isEmpty) return null;
-          return snap.docs.map((doc) {
-            final d = doc.data();
-            return StudentModel.fromJson({
-              'id': doc.id,
-              'name': d['name'] ?? '',
-              'status': d['status'] ?? 'engaged',
-              'statusNote': d['statusNote'],
-            });
-          }).toList();
+          if (teacherId.isEmpty) return null;
+          if (classCode.isEmpty) return [];
+          final raw = await ApiService.getStudents(classGroup: classCode);
+          return raw.map((d) => StudentModel.fromJson({
+                'id': (d['id'] ?? d['_id'] ?? '').toString(),
+                'name': d['name'] ?? '',
+                'status': _mapEngagementLevel(d['engagementLevel'] as String?),
+                'statusNote': d['statusNote'],
+              })).toList();
+          // Returns empty list if no students — no mock fallback.
         },
         () => MockDataService.getRosterForClassByTeacher(classCode, teacherId),
       );
+
+  // ── Live session (droid data) ──────────────────────────────────────────────
+
+  // Returns the active or most recent session report for today.
+  // Returns null when no droid has reported yet (UI keeps mock placeholder).
+  static Future<Map<String, dynamic>?> getLiveSession(String classGroup) async {
+    try {
+      final now = DateTime.now();
+      final date =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final reports = await ApiService.getSessionReports(date);
+      if (reports.isEmpty) return null;
+
+      // Prefer an in-progress session for this class; fall back to latest.
+      final forClass = classGroup.isEmpty
+          ? reports
+          : reports
+              .where((r) => (r['classGroup'] as String?) == classGroup)
+              .toList();
+
+      if (forClass.isEmpty) return null;
+
+      final inProgress = forClass
+          .where((r) => (r['status'] as String?) == 'in_progress')
+          .toList();
+      return (inProgress.isNotEmpty ? inProgress.last : forClass.last)
+          as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ── Per-student engagement from session report ─────────────────────────────
+
+  // Overlays droid engagement levels onto a roster fetched from the students API.
+  static Future<List<StudentModel>> getRosterWithEngagement(
+    String classCode,
+    String teacherId,
+  ) async {
+    final roster = await getRosterForClass(classCode, teacherId);
+    if (roster.isEmpty) return roster;
+
+    try {
+      final now = DateTime.now();
+      final date =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final reports = await ApiService.getSessionReports(date);
+      final sessionReport = reports
+          .where((r) =>
+              (r['classGroup'] as String?) == classCode &&
+              (r['status'] as String?) == 'in_progress')
+          .lastOrNull as Map<String, dynamic>?;
+
+      if (sessionReport == null) return roster;
+
+      final engagements = (sessionReport['studentEngagements'] as List?) ?? [];
+      final engMap = <String, Map<String, dynamic>>{
+        for (final e in engagements)
+          (e['studentId'] as String? ?? ''): e as Map<String, dynamic>,
+      };
+
+      return roster.map((s) {
+        final eng = engMap[s.id];
+        if (eng == null) return s;
+        return StudentModel.fromJson({
+          'id': s.id,
+          'name': s.name,
+          'status': _mapEngagementLevel(eng['engagementLevel'] as String?),
+          'statusNote': s.statusNote,
+          'classCode': s.classCode,
+        });
+      }).toList();
+    } catch (_) {
+      return roster;
+    }
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  // Maps droid engagementLevel → app student status string.
+  static String _mapEngagementLevel(String? level) => switch (level) {
+        'high' => 'engaged',
+        'medium' => 'engaged',
+        'low' => 'distracted',
+        'absent' => 'flagged',
+        _ => 'engaged',
+      };
 }
