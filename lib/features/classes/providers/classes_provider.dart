@@ -30,6 +30,8 @@ class StudentWithClass {
 class ClassesState {
   final List<ClassModel> classes;
   final List<StudentWithClass> allStudents;
+  /// classCode → avgFocusScore 0-100, populated from completed session reports.
+  final Map<String, int> classEngagementScores;
   final ClassesTab activeTab;
   final String searchQuery;
   final String? statusFilter;
@@ -40,6 +42,7 @@ class ClassesState {
   const ClassesState({
     required this.classes,
     required this.allStudents,
+    this.classEngagementScores = const {},
     this.activeTab = ClassesTab.periods,
     this.searchQuery = '',
     this.statusFilter,
@@ -58,8 +61,8 @@ class ClassesState {
                 c.code.toLowerCase().contains(searchQuery.toLowerCase()) ||
                 c.subject.toLowerCase().contains(searchQuery.toLowerCase()))
             .toList();
-    if (statusFilter != null) {
-      list = list.where((c) => c.status == statusFilter).toList();
+    if (subjectFilter != null) {
+      list = list.where((c) => c.subject == subjectFilter).toList();
     }
     return list;
   }
@@ -82,7 +85,16 @@ class ClassesState {
     }
 
     if (statusFilter != null) {
-      list = list.where((sw) => sw.student.status == statusFilter).toList();
+      list = list.where((sw) {
+        final s = sw.student.status;
+        // Treat 'pending' and any unknown status as 'engaged' (no droid data yet).
+        final effective = s == 'distracted'
+            ? 'distracted'
+            : s == 'flagged'
+                ? 'flagged'
+                : 'engaged';
+        return effective == statusFilter;
+      }).toList();
     }
 
     if (subjectFilter != null) {
@@ -106,6 +118,7 @@ class ClassesState {
   ClassesState copyWith({
     List<ClassModel>? classes,
     List<StudentWithClass>? allStudents,
+    Map<String, int>? classEngagementScores,
     ClassesTab? activeTab,
     String? searchQuery,
     String? statusFilter,
@@ -119,6 +132,7 @@ class ClassesState {
       ClassesState(
         classes: classes ?? this.classes,
         allStudents: allStudents ?? this.allStudents,
+        classEngagementScores: classEngagementScores ?? this.classEngagementScores,
         activeTab: activeTab ?? this.activeTab,
         searchQuery: searchQuery ?? this.searchQuery,
         statusFilter:
@@ -233,6 +247,65 @@ class ClassesNotifier extends StateNotifier<ClassesState> {
       allStudents: allStudents,
       isLoading: false,
     );
+
+    // Fetch engagement scores for each class in the background.
+    _refreshEngagementScores(updatedClasses.map((c) => c.code).toList());
+  }
+
+  Future<void> _refreshEngagementScores(List<String> classCodes) async {
+    final scores = <String, int>{};
+    // studentId → droid-computed engagement category
+    final studentCategories = <String, String>{};
+
+    for (final code in classCodes) {
+      final summary = await MongoDataService.getClassSummary(code);
+      final score = summary['avgFocusScore'];
+      if (score != null && (summary['totalSessions'] as int? ?? 0) > 0) {
+        scores[code] = (score as num).toInt();
+      }
+
+      // Update each student's status from their latest session focusScore.
+      final breakdown = (summary['studentBreakdown'] as List?) ?? [];
+      for (final s in breakdown) {
+        final id = s['studentId'] as String?;
+        if (id == null || id.isEmpty) continue;
+        final focus = (s['latestFocusScore'] as num?)?.toInt() ??
+            (s['avgFocusScore'] as num?)?.toInt() ?? 0;
+        studentCategories[id] = _scoreToCategory(focus);
+      }
+    }
+
+    if (!mounted) return;
+
+    // Rewrite student statuses based on real droid data.
+    if (studentCategories.isNotEmpty) {
+      final updated = state.allStudents.map((sw) {
+        final cat = studentCategories[sw.student.id];
+        return cat != null
+            ? StudentWithClass(
+                student: sw.student.copyWith(status: cat),
+                classCode: sw.classCode,
+              )
+            : sw;
+      }).toList();
+      state = state.copyWith(
+        allStudents: updated,
+        classEngagementScores: scores.isEmpty
+            ? state.classEngagementScores
+            : {...state.classEngagementScores, ...scores},
+      );
+    } else if (scores.isNotEmpty) {
+      state = state.copyWith(classEngagementScores: {
+        ...state.classEngagementScores,
+        ...scores,
+      });
+    }
+  }
+
+  static String _scoreToCategory(int score) {
+    if (score >= 65) return 'engaged';
+    if (score >= 35) return 'distracted';
+    return 'flagged';
   }
 
   List<StudentWithClass> _buildAllStudents({String? teacherId}) {

@@ -120,7 +120,9 @@ abstract final class MongoDataService {
             students.addAll(raw.map((d) => StudentModel.fromJson({
                   'id': (d['id'] ?? d['_id'] ?? '').toString(),
                   'name': d['name'] ?? '',
-                  'status': d['status'] ?? 'engaged',
+                  // engagementLevel is computed by the API from session reports.
+                  // Falls back to 'engaged' when no droid data exists yet.
+                  'status': (d['engagementLevel'] as String?) ?? 'engaged',
                   'statusNote': d['statusNote'],
                   'classCode': d['classGroup'] ?? code,
                 })));
@@ -178,6 +180,33 @@ abstract final class MongoDataService {
       return null;
     }
   }
+
+  // ── Historical reports for one student ────────────────────────────────────
+
+  static Future<List<Map<String, dynamic>>> getStudentReports(
+      String studentId, {String? name}) =>
+      _withFallback(
+        () async {
+          if (studentId.isEmpty) return null;
+          final raw = await ApiService.getStudentReports(studentId, name: name);
+          return raw.cast<Map<String, dynamic>>();
+        },
+        () => <Map<String, dynamic>>[],
+      );
+
+  // ── Class engagement summary ───────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> getClassSummary(
+    String classGroup, {
+    String? date,
+  }) =>
+      _withFallback(
+        () async {
+          if (classGroup.isEmpty) return null;
+          return await ApiService.getClassSummary(classGroup, date: date);
+        },
+        () => <String, dynamic>{},
+      );
 
   // ── Per-student engagement from session report ─────────────────────────────
 

@@ -44,6 +44,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (_) => _BottomSheet(
         title: 'Select Classroom',
         child: classes.isEmpty
@@ -106,6 +107,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (_) => _BottomSheet(
         title: 'Select Subject',
         child: subjects.isEmpty
@@ -152,6 +154,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
   void _showDateRangePicker() {
     const presets = [
+      'Today',
       'Last 7 Days',
       'Last 14 Days',
       'Last 30 Days',
@@ -163,6 +166,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (_) => _BottomSheet(
         title: 'Select Date Range',
         child: Column(
@@ -238,6 +242,42 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
   Future<void> _generateExport(String type) async {
     if (!mounted) return;
+
+    final notifier = ref.read(reportsProvider.notifier);
+    final isRealPdf = type == 'PDF' && notifier.canDownloadPdf;
+
+    if (isRealPdf) {
+      // Real PDF: skip the blocking dialog so the app stays visible when
+      // the Android share sheet opens. Show a non-blocking loading snackbar.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Generating PDF…'),
+            ],
+          ),
+          duration: const Duration(seconds: 30),
+          backgroundColor: AppColors.primaryGreen,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      await notifier.generateExport(type);
+      if (mounted) ScaffoldMessenger.of(context).clearSnackBars();
+      return;
+    }
+
+    // Non-PDF / mock path: show blocking dialog as usual.
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -269,7 +309,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       ),
     );
 
-    await ref.read(reportsProvider.notifier).generateExport(type);
+    await notifier.generateExport(type);
 
     if (mounted) Navigator.of(context).pop();
     if (mounted) {
@@ -280,7 +320,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               const Icon(Icons.check_circle_outline,
                   color: Colors.white, size: 18),
               const SizedBox(width: 8),
-              Text('$type report generated and saved to History'),
+              Expanded(
+                child: Text('$type report generated and saved to History'),
+              ),
             ],
           ),
           backgroundColor: AppColors.primaryGreen,
@@ -621,39 +663,48 @@ class _BottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+    final bottomPad = MediaQuery.of(context).viewInsets.bottom + 32;
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
-      padding: EdgeInsets.fromLTRB(
-          20, 12, 20, MediaQuery.of(context).viewInsets.bottom + 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Theme.of(context).dividerColor,
-                borderRadius: BorderRadius.circular(2),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: EdgeInsets.fromLTRB(20, 12, 20, bottomPad),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).dividerColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.onSurface,
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          child,
-        ],
+            const SizedBox(height: 8),
+            Flexible(
+              child: SingleChildScrollView(
+                child: child,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -689,6 +740,8 @@ class _FilterRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textPrimary,
@@ -846,6 +899,8 @@ class _ReportTypeSelector extends StatelessWidget {
                             : AppColors.textSecondary,
                       ),
                       textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),

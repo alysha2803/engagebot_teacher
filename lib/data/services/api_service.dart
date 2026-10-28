@@ -116,6 +116,26 @@ class ApiService {
     return res.data ?? {};
   }
 
+  static Future<List<dynamic>> getStudentReports(
+      String studentId, {String? name}) async {
+    final res = await _dio.get<List<dynamic>>(
+      '/reports/student/$studentId',
+      queryParameters: name != null ? {'name': name} : null,
+    );
+    return res.data ?? [];
+  }
+
+  static Future<Map<String, dynamic>> getClassSummary(
+    String classGroup, {
+    String? date,
+  }) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '/reports/class/${Uri.encodeComponent(classGroup)}',
+      queryParameters: date != null ? {'date': date} : null,
+    );
+    return res.data ?? {};
+  }
+
   // ── Generic GET helper ───────────────────────────────────────────────────────
 
   static Future<T> get<T>(String path) async {

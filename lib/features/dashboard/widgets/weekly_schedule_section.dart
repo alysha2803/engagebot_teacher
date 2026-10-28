@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 
@@ -376,14 +377,21 @@ class _ScheduleTile extends StatelessWidget {
     final color = _subjectColor(subject);
     final isOngoing = status == 'ongoing';
 
-    return Container(
-      decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : Border(bottom: BorderSide(color: context.colorBorder)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
+    return InkWell(
+      onTap: classGroup.isNotEmpty
+          ? () => context.push('/class-detail/${Uri.encodeComponent(classGroup)}')
+          : null,
+      borderRadius: isLast
+          ? const BorderRadius.vertical(bottom: Radius.circular(16))
+          : BorderRadius.zero,
+      child: Container(
+        decoration: BoxDecoration(
+          border: isLast
+              ? null
+              : Border(bottom: BorderSide(color: context.colorBorder)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
         children: [
           // Subject colour bar
           Container(
@@ -479,6 +487,7 @@ class _ScheduleTile extends StatelessWidget {
               ),
             ),
         ],
+        ),
       ),
     );
   }

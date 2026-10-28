@@ -5,11 +5,8 @@ import '../../app/theme/app_colors.dart';
 import '../../data/mock/mock_data_service.dart';
 import '../../data/models/analytics_models.dart';
 import '../../shared/widgets/engagebot_scaffold.dart';
-import '../../shared/widgets/shared_widgets.dart';
 import 'providers/dashboard_provider.dart';
-import '../classes/providers/classes_provider.dart';
 import 'widgets/live_session_card.dart';
-import 'widgets/class_selector_row.dart';
 import 'widgets/weekly_schedule_section.dart';
 
 String _currentPeriod() {
@@ -43,7 +40,6 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(dashboardProvider);
-    final notifier = ref.read(dashboardProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
@@ -82,43 +78,6 @@ class DashboardScreen extends ConsumerWidget {
                             state.liveEngagement['droidStatus'] as String,
                         period: _currentPeriod(),
                         hasClasses: true,
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // ── Select Class ───────────────────────────────────────────────
-                      SectionHeader(
-                        title: 'Select Class',
-                        trailing: TextButton(
-                          onPressed: () {
-                            ref.read(classesProvider.notifier).setTab(ClassesTab.periods);
-                            context.go('/classes');
-                          },
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.primaryGreen,
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text(
-                            'View All',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ClassSelectorRow(
-                        classes: state.classes,
-                        selectedIndex: state.selectedClassIndex,
-                        onSelect: (i) {
-                          notifier.selectClass(i);
-                          context.push(
-                            '/class-detail/${Uri.encodeComponent(state.classes[i].code)}',
-                          );
-                        },
                       ),
 
                       const SizedBox(height: 24),

@@ -24,9 +24,15 @@ class ClassesScreen extends ConsumerWidget {
       builder: (_) {
         if (isPeriods) {
           return _PeriodFilterSheet(
-            current: state.statusFilter,
+            current: state.subjectFilter,
+            subjects: state.classes
+                .map((c) => c.subject)
+                .where((s) => s.isNotEmpty)
+                .toSet()
+                .toList()
+              ..sort(),
             onSelect: (v) {
-              notifier.setStatusFilter(v);
+              notifier.setSubjectFilter(v);
               Navigator.of(context).pop();
             },
           );
@@ -136,6 +142,7 @@ class ClassesScreen extends ConsumerWidget {
               // Periods — class grid
               ClassGrid(
                 classes: state.filteredClasses,
+                engagementScores: state.classEngagementScores,
                 onTap: (cls) => context.push(
                   '/class-detail/${Uri.encodeComponent(cls.code)}',
                 ),
@@ -203,21 +210,20 @@ class _ActiveFilterBadge extends StatelessWidget {
 
 class _PeriodFilterSheet extends StatefulWidget {
   final String? current;
+  final List<String> subjects;
   final void Function(String?) onSelect;
 
-  const _PeriodFilterSheet({required this.current, required this.onSelect});
+  const _PeriodFilterSheet({
+    required this.current,
+    required this.subjects,
+    required this.onSelect,
+  });
 
   @override
   State<_PeriodFilterSheet> createState() => _PeriodFilterSheetState();
 }
 
 class _PeriodFilterSheetState extends State<_PeriodFilterSheet> {
-  static const _options = [
-    ('All Classes', null),
-    ('Online', 'online'),
-    ('Offline', 'offline'),
-  ];
-
   late String? _current;
 
   @override
@@ -251,7 +257,7 @@ class _PeriodFilterSheetState extends State<_PeriodFilterSheet> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Filter Classes',
+            'Filter by Subject',
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w700,
@@ -259,12 +265,30 @@ class _PeriodFilterSheetState extends State<_PeriodFilterSheet> {
             ),
           ),
           const SizedBox(height: 8),
-          ..._options.map((opt) {
-            final isSelected = _current == opt.$2;
+          // "All" option clears the filter
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              'All Subjects',
+              style: TextStyle(
+                fontWeight: _current == null ? FontWeight.w600 : FontWeight.normal,
+                color: _current == null ? AppColors.primaryGreen : context.colorOnCard,
+              ),
+            ),
+            trailing: _current == null
+                ? const Icon(Icons.check, color: AppColors.primaryGreen, size: 18)
+                : null,
+            onTap: () {
+              setState(() => _current = null);
+              widget.onSelect(null);
+            },
+          ),
+          ...widget.subjects.map((subject) {
+            final isSelected = _current == subject;
             return ListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(
-                opt.$1,
+                subject,
                 style: TextStyle(
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   color: isSelected ? AppColors.primaryGreen : context.colorOnCard,
@@ -274,8 +298,8 @@ class _PeriodFilterSheetState extends State<_PeriodFilterSheet> {
                   ? const Icon(Icons.check, color: AppColors.primaryGreen, size: 18)
                   : null,
               onTap: () {
-                setState(() => _current = opt.$2);
-                widget.onSelect(opt.$2);
+                setState(() => _current = subject);
+                widget.onSelect(subject);
               },
             );
           }),
