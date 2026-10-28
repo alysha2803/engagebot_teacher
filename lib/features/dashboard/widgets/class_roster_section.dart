@@ -237,18 +237,16 @@ class _EditStudentsSheetState extends State<_EditStudentsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final maxListHeight = MediaQuery.of(context).size.height * 0.55;
+
     return Container(
       decoration: BoxDecoration(
         color: context.colorCard,
         borderRadius:
             const BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        12,
-        20,
-        MediaQuery.of(context).viewInsets.bottom + 32,
-      ),
+      padding: EdgeInsets.fromLTRB(20, 12, 20, bottomInset + 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -287,10 +285,14 @@ class _EditStudentsSheetState extends State<_EditStudentsSheet> {
           Divider(height: 8, color: context.colorBorder),
           const SizedBox(height: 4),
 
-          ..._students.map(
-            (student) => _StudentEditRow(
-              student: student,
-              onEdit: _handleEdit,
+          // Scrollable student list — constrained so it never overflows
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxListHeight),
+            child: ListView(
+              shrinkWrap: true,
+              children: _students
+                  .map((s) => _StudentEditRow(student: s, onEdit: _handleEdit))
+                  .toList(),
             ),
           ),
         ],

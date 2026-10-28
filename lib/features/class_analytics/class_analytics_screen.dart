@@ -7,7 +7,7 @@ import '../../data/mock/mock_data_service.dart';
 import '../../data/models/analytics_models.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/student_model.dart';
-import '../../data/services/firebase_data_service.dart';
+import '../../data/services/mongo_data_service.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import '../auth/providers/auth_provider.dart';
 import '../dashboard/providers/dashboard_provider.dart';
@@ -36,6 +36,9 @@ class _ClassAnalyticsScreenState extends ConsumerState<ClassAnalyticsScreen>
   List<StudentBehaviourRecord> _baseBehaviourData = [];
   late final List<WeeklyDataPoint> _weeklyTrend;
   late final List<SessionRecord> _sessionHistory;
+  // studentId → latestFocusScore from droid (null = no droid data yet)
+  Map<String, int> _droidScores = {};
+  int? _droidOverallScore; // average across all students with droid data
 
   @override
   void initState() {
@@ -61,17 +64,53 @@ class _ClassAnalyticsScreenState extends ConsumerState<ClassAnalyticsScreen>
     _weeklyTrend = MockDataService.getWeeklyTrend(_cls.code);
     _sessionHistory = MockDataService.getSessionHistory(_cls.code);
 
-    // Replace mock roster with live Firebase data.
+    // Replace mock roster with live Firebase data + droid scores.
     _loadRosterFromFirebase();
+    _loadDroidScores();
+  }
+
+  Future<void> _loadDroidScores() async {
+    final summary = await MongoDataService.getClassSummary(widget.classCode);
+    final breakdown = (summary['studentBreakdown'] as List?) ?? [];
+    if (!mounted) return;
+    final scores = {
+      for (final s in breakdown)
+        (s['studentId'] as String? ?? ''):
+            (s['latestFocusScore'] as num?)?.toInt() ??
+            (s['avgFocusScore'] as num?)?.toInt() ?? 0,
+    };
+    final vals = scores.values.toList();
+    final overall = vals.isEmpty
+        ? null
+        : (vals.reduce((a, b) => a + b) / vals.length).round();
+    setState(() {
+      _droidScores = scores;
+      _droidOverallScore = overall;
+    });
   }
 
   Future<void> _loadRosterFromFirebase() async {
     final teacherId = ref.read(currentTeacherIdProvider) ?? '';
     if (teacherId.isEmpty || !mounted) return;
-    final fbRoster = await FirebaseDataService.getRosterForClass(
+    final fbRoster = await MongoDataService.getRosterForClass(
         widget.classCode, teacherId);
     if (!mounted) return;
-    setState(() => _baseRoster = fbRoster);
+    setState(() {
+      _baseRoster = fbRoster;
+      // Derive behaviour records from the real roster. Engagement metrics
+      // (score, attention minutes, off-task count) will come from the droid
+      // once it is available; until then use neutral placeholders.
+      _baseBehaviourData = fbRoster
+          .map((s) => StudentBehaviourRecord(
+                studentId: s.id,
+                studentName: s.name,
+                engagementScore: 75,
+                attentionMinutes: 30,
+                offTaskCount: 0,
+                dominantStatus: s.status,
+              ))
+          .toList();
+    });
   }
 
   @override
@@ -155,9 +194,11 @@ class _ClassAnalyticsScreenState extends ConsumerState<ClassAnalyticsScreen>
             cls: _cls,
             roster: roster,
             engagement: _engagement,
+            droidScores: _droidScores,
+            droidOverallScore: _droidOverallScore,
             aiRec: MockDataService.getAIRecommendation(),
           ),
-          _BehaviourTab(behaviourData: behaviourData),
+          _BehaviourTab(behaviourData: behaviourData, droidScores: _droidScores),
           _HistoryTab(
             weeklyTrend: _weeklyTrend,
             sessionHistory: _sessionHistory,
@@ -168,6 +209,16 @@ class _ClassAnalyticsScreenState extends ConsumerState<ClassAnalyticsScreen>
   }
 }
 
+// Shared helper: derive engaged/distracted/flagged from droid score.
+// Falls back to roster status when no droid data is available for the student.
+String _engagementCategory(String studentId, String fallbackStatus, Map<String, int> scores) {
+  final score = scores[studentId];
+  if (score == null) return fallbackStatus;
+  if (score >= 65) return 'engaged';
+  if (score >= 35) return 'distracted';
+  return 'flagged';
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB 1 — Overview  (UC-6.3)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -176,20 +227,24 @@ class _OverviewTab extends StatelessWidget {
   final ClassModel cls;
   final List<StudentModel> roster;
   final Map<String, dynamic> engagement;
+  final Map<String, int> droidScores;
+  final int? droidOverallScore;
   final Map<String, dynamic> aiRec;
 
   const _OverviewTab({
     required this.cls,
     required this.roster,
     required this.engagement,
+    required this.droidScores,
     required this.aiRec,
+    this.droidOverallScore,
   });
 
   @override
   Widget build(BuildContext context) {
-    final onlineCount = roster.where((s) => s.status == 'engaged').length;
-    final distractedCount = roster.where((s) => s.status == 'distracted').length;
-    final flaggedCount = roster.where((s) => s.status == 'flagged').length;
+    final onlineCount = roster.where((s) => _engagementCategory(s.id, s.status, droidScores) == 'engaged').length;
+    final distractedCount = roster.where((s) => _engagementCategory(s.id, s.status, droidScores) == 'distracted').length;
+    final flaggedCount = roster.where((s) => _engagementCategory(s.id, s.status, droidScores) == 'flagged').length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -200,7 +255,7 @@ class _OverviewTab extends StatelessWidget {
 
           // Engagement card
           _ClassEngagementCard(
-            percentage: engagement['percentage'] as int,
+            percentage: droidOverallScore ?? engagement['percentage'] as int,
             trend: engagement['trend'] as String,
             sessionMinutes: engagement['sessionMinutes'] as int,
             studentCount: cls.studentCount,
@@ -270,17 +325,24 @@ class _OverviewTab extends StatelessWidget {
 
 class _BehaviourTab extends StatelessWidget {
   final List<StudentBehaviourRecord> behaviourData;
+  final Map<String, int> droidScores;
 
-  const _BehaviourTab({required this.behaviourData});
+  const _BehaviourTab({
+    required this.behaviourData,
+    this.droidScores = const {},
+  });
 
   @override
   Widget build(BuildContext context) {
-    final engagedList =
-        behaviourData.where((r) => r.dominantStatus == 'engaged').toList();
-    final distractedList =
-        behaviourData.where((r) => r.dominantStatus == 'distracted').toList();
-    final flaggedList =
-        behaviourData.where((r) => r.dominantStatus == 'flagged').toList();
+    final engagedList = behaviourData
+        .where((r) => _engagementCategory(r.studentId, r.dominantStatus, droidScores) == 'engaged')
+        .toList();
+    final distractedList = behaviourData
+        .where((r) => _engagementCategory(r.studentId, r.dominantStatus, droidScores) == 'distracted')
+        .toList();
+    final flaggedList = behaviourData
+        .where((r) => _engagementCategory(r.studentId, r.dominantStatus, droidScores) == 'flagged')
+        .toList();
 
     final total = behaviourData.length;
     final avgScore = total == 0

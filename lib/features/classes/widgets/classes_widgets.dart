@@ -143,9 +143,15 @@ class _Tab extends StatelessWidget {
 
 class ClassGrid extends StatelessWidget {
   final List<ClassModel> classes;
+  final Map<String, int> engagementScores;
   final void Function(ClassModel cls) onTap;
 
-  const ClassGrid({super.key, required this.classes, required this.onTap});
+  const ClassGrid({
+    super.key,
+    required this.classes,
+    this.engagementScores = const {},
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -168,11 +174,14 @@ class ClassGrid extends StatelessWidget {
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 1.1,
+        childAspectRatio: 0.9,
       ),
       itemCount: classes.length,
-      itemBuilder: (context, index) =>
-          ClassCard(cls: classes[index], onTap: () => onTap(classes[index])),
+      itemBuilder: (context, index) => ClassCard(
+        cls: classes[index],
+        engagementScore: engagementScores[classes[index].code],
+        onTap: () => onTap(classes[index]),
+      ),
     );
   }
 }
@@ -183,14 +192,18 @@ class ClassGrid extends StatelessWidget {
 
 class ClassCard extends StatelessWidget {
   final ClassModel cls;
+  final int? engagementScore;
   final VoidCallback onTap;
 
-  const ClassCard({super.key, required this.cls, required this.onTap});
+  const ClassCard({
+    super.key,
+    required this.cls,
+    this.engagementScore,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isOnline = cls.isOnline;
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -203,30 +216,6 @@ class ClassCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 3),
-                decoration: BoxDecoration(
-                  color: isOnline
-                      ? context.colorIconBg
-                      : context.colorBorder.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  cls.status,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isOnline
-                        ? AppColors.primaryGreen
-                        : context.colorMuted,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
             Container(
               width: 36,
               height: 36,
@@ -299,6 +288,13 @@ class StudentAttentionList extends StatelessWidget {
     required this.onTap,
   });
 
+  // Extract the leading numeric form level from a classCode.
+  // "2 Gigih" → "2",  "1 Usaha" → "1",  "Gigih" → "Gigih"
+  static String _formLevel(String classCode) {
+    final m = RegExp(r'^\d+').firstMatch(classCode.trim());
+    return m?.group(0) ?? classCode.trim();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (students.isEmpty) {
@@ -313,40 +309,37 @@ class StudentAttentionList extends StatelessWidget {
       );
     }
 
-    final needsAttention =
-        students.where((s) => s.student.status != 'engaged').toList();
-    final engaged =
-        students.where((s) => s.student.status == 'engaged').toList();
+    // Group by form level.
+    final grouped = <String, List<StudentWithClass>>{};
+    for (final sw in students) {
+      final key = _formLevel(sw.classCode);
+      grouped.putIfAbsent(key, () => []).add(sw);
+    }
+
+    // Sort numerically; non-numeric keys go last alphabetically.
+    final sortedLevels = grouped.keys.toList()
+      ..sort((a, b) {
+        final ia = int.tryParse(a);
+        final ib = int.tryParse(b);
+        if (ia != null && ib != null) return ia.compareTo(ib);
+        if (ia != null) return -1;
+        if (ib != null) return 1;
+        return a.compareTo(b);
+      });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (needsAttention.isNotEmpty) ...[
+        for (int i = 0; i < sortedLevels.length; i++) ...[
+          if (i > 0) const SizedBox(height: 16),
           _SectionHeader(
-            icon: Icons.flag_rounded,
-            label: 'Needs Attention',
-            count: needsAttention.length,
-            iconColor: AppColors.liveRed,
+            icon: Icons.school_outlined,
+            label: 'Form ${sortedLevels[i]}',
+            count: grouped[sortedLevels[i]]!.length,
+            iconColor: AppColors.primaryGreen,
           ),
           const SizedBox(height: 8),
-          ...needsAttention.map(
-            (sw) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _StudentRow(sw: sw, onTap: () => onTap(sw)),
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-
-        if (engaged.isNotEmpty) ...[
-          _SectionHeader(
-            icon: Icons.check_circle_outline,
-            label: 'Engaged',
-            count: engaged.length,
-            iconColor: AppColors.successGreen,
-          ),
-          const SizedBox(height: 8),
-          ...engaged.map(
+          ...grouped[sortedLevels[i]]!.map(
             (sw) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: _StudentRow(sw: sw, onTap: () => onTap(sw)),
@@ -413,16 +406,23 @@ class _StudentRow extends StatelessWidget {
 
   const _StudentRow({required this.sw, required this.onTap});
 
-  Color get _statusColor => switch (sw.student.status) {
+  // Normalize any non-standard status (e.g. 'pending') to 'engaged'.
+  String get _effectiveStatus {
+    final s = sw.student.status;
+    return (s == 'distracted' || s == 'flagged') ? s : 'engaged';
+  }
+
+  Color get _statusColor => switch (_effectiveStatus) {
         'flagged' => AppColors.liveRed,
         'distracted' => AppColors.warningAmber,
         _ => AppColors.successGreen,
       };
 
-  String get _statusLabel {
-    final s = sw.student.status;
-    return s[0].toUpperCase() + s.substring(1);
-  }
+  String get _statusLabel => switch (_effectiveStatus) {
+        'flagged' => 'Flagged',
+        'distracted' => 'Distracted',
+        _ => 'Engaged',
+      };
 
   @override
   Widget build(BuildContext context) {

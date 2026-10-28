@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/mock/mock_data_service.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
-import '../../../data/services/firebase_data_service.dart';
+import '../../../data/services/mongo_data_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 
@@ -30,17 +30,24 @@ class StudentWithClass {
 class ClassesState {
   final List<ClassModel> classes;
   final List<StudentWithClass> allStudents;
+  /// classCode → avgFocusScore 0-100, populated from completed session reports.
+  final Map<String, int> classEngagementScores;
   final ClassesTab activeTab;
   final String searchQuery;
-  final String? statusFilter; // null = show all
+  final String? statusFilter;
+  final String? subjectFilter;
+  final String? classroomFilter;
   final bool isLoading;
 
   const ClassesState({
     required this.classes,
     required this.allStudents,
+    this.classEngagementScores = const {},
     this.activeTab = ClassesTab.periods,
     this.searchQuery = '',
     this.statusFilter,
+    this.subjectFilter,
+    this.classroomFilter,
     this.isLoading = false,
   });
 
@@ -54,8 +61,8 @@ class ClassesState {
                 c.code.toLowerCase().contains(searchQuery.toLowerCase()) ||
                 c.subject.toLowerCase().contains(searchQuery.toLowerCase()))
             .toList();
-    if (statusFilter != null) {
-      list = list.where((c) => c.status == statusFilter).toList();
+    if (subjectFilter != null) {
+      list = list.where((c) => c.subject == subjectFilter).toList();
     }
     return list;
   }
@@ -78,7 +85,28 @@ class ClassesState {
     }
 
     if (statusFilter != null) {
-      list = list.where((sw) => sw.student.status == statusFilter).toList();
+      list = list.where((sw) {
+        final s = sw.student.status;
+        // Treat 'pending' and any unknown status as 'engaged' (no droid data yet).
+        final effective = s == 'distracted'
+            ? 'distracted'
+            : s == 'flagged'
+                ? 'flagged'
+                : 'engaged';
+        return effective == statusFilter;
+      }).toList();
+    }
+
+    if (subjectFilter != null) {
+      final codesWithSubject = classes
+          .where((c) => c.subject == subjectFilter)
+          .map((c) => c.code)
+          .toSet();
+      list = list.where((sw) => codesWithSubject.contains(sw.classCode)).toList();
+    }
+
+    if (classroomFilter != null) {
+      list = list.where((sw) => sw.classCode == classroomFilter).toList();
     }
 
     return List.of(list)
@@ -90,19 +118,30 @@ class ClassesState {
   ClassesState copyWith({
     List<ClassModel>? classes,
     List<StudentWithClass>? allStudents,
+    Map<String, int>? classEngagementScores,
     ClassesTab? activeTab,
     String? searchQuery,
     String? statusFilter,
+    String? subjectFilter,
+    String? classroomFilter,
     bool clearStatusFilter = false,
+    bool clearSubjectFilter = false,
+    bool clearClassroomFilter = false,
     bool? isLoading,
   }) =>
       ClassesState(
         classes: classes ?? this.classes,
         allStudents: allStudents ?? this.allStudents,
+        classEngagementScores: classEngagementScores ?? this.classEngagementScores,
         activeTab: activeTab ?? this.activeTab,
         searchQuery: searchQuery ?? this.searchQuery,
         statusFilter:
             clearStatusFilter ? null : (statusFilter ?? this.statusFilter),
+        subjectFilter:
+            clearSubjectFilter ? null : (subjectFilter ?? this.subjectFilter),
+        classroomFilter: clearClassroomFilter
+            ? null
+            : (classroomFilter ?? this.classroomFilter),
         isLoading: isLoading ?? this.isLoading,
       );
 }
@@ -152,20 +191,47 @@ class ClassesNotifier extends StateNotifier<ClassesState> {
       final id = _ref.read(currentTeacherIdProvider) ?? '';
       if (id.isNotEmpty) refreshFromFirebase(id);
     });
+
+    // Re-sync whenever dashboardProvider refreshes its class list (e.g. every
+    // 60 s or after the admin edits the schedule).
+    _ref.listen<List<ClassModel>>(
+      dashboardProvider.select((s) => s.classes),
+      (prev, next) {
+        if (next == prev) return;
+        final id = _ref.read(currentTeacherIdProvider) ?? '';
+        if (id.isNotEmpty) refreshFromFirebase(id);
+      },
+    );
   }
 
-  /// Loads the real class list and full student roster from Firestore,
-  /// replacing the mock-populated initial state.
+  /// Loads the real class list and full student roster from the API.
   Future<void> refreshFromFirebase(String teacherId) async {
     if (!mounted) return;
     state = state.copyWith(isLoading: true);
 
-    final classes = await FirebaseDataService.getClasses(teacherId);
+    final classes = await MongoDataService.getClasses(teacherId);
     if (!mounted) return;
 
     final allFromFirebase =
-        await FirebaseDataService.getAllStudentsForTeacher(teacherId);
+        await MongoDataService.getAllStudentsForTeacher(teacherId);
     if (!mounted) return;
+
+    // Count students per class code so ClassCard shows real numbers.
+    final countByClass = <String, int>{};
+    for (final s in allFromFirebase) {
+      if (s.classCode != null && s.classCode!.isNotEmpty) {
+        countByClass[s.classCode!] = (countByClass[s.classCode!] ?? 0) + 1;
+      }
+    }
+
+    final updatedClasses = classes
+        .map((c) => ClassModel(
+              code: c.code,
+              subject: c.subject,
+              studentCount: countByClass[c.code] ?? 0,
+              status: c.status,
+            ))
+        .toList();
 
     final edits = _ref.read(studentEditsProvider);
     final allStudents = allFromFirebase
@@ -177,10 +243,69 @@ class ClassesNotifier extends StateNotifier<ClassesState> {
         .toList();
 
     state = state.copyWith(
-      classes: classes,
+      classes: updatedClasses,
       allStudents: allStudents,
       isLoading: false,
     );
+
+    // Fetch engagement scores for each class in the background.
+    _refreshEngagementScores(updatedClasses.map((c) => c.code).toList());
+  }
+
+  Future<void> _refreshEngagementScores(List<String> classCodes) async {
+    final scores = <String, int>{};
+    // studentId → droid-computed engagement category
+    final studentCategories = <String, String>{};
+
+    for (final code in classCodes) {
+      final summary = await MongoDataService.getClassSummary(code);
+      final score = summary['avgFocusScore'];
+      if (score != null && (summary['totalSessions'] as int? ?? 0) > 0) {
+        scores[code] = (score as num).toInt();
+      }
+
+      // Update each student's status from their latest session focusScore.
+      final breakdown = (summary['studentBreakdown'] as List?) ?? [];
+      for (final s in breakdown) {
+        final id = s['studentId'] as String?;
+        if (id == null || id.isEmpty) continue;
+        final focus = (s['latestFocusScore'] as num?)?.toInt() ??
+            (s['avgFocusScore'] as num?)?.toInt() ?? 0;
+        studentCategories[id] = _scoreToCategory(focus);
+      }
+    }
+
+    if (!mounted) return;
+
+    // Rewrite student statuses based on real droid data.
+    if (studentCategories.isNotEmpty) {
+      final updated = state.allStudents.map((sw) {
+        final cat = studentCategories[sw.student.id];
+        return cat != null
+            ? StudentWithClass(
+                student: sw.student.copyWith(status: cat),
+                classCode: sw.classCode,
+              )
+            : sw;
+      }).toList();
+      state = state.copyWith(
+        allStudents: updated,
+        classEngagementScores: scores.isEmpty
+            ? state.classEngagementScores
+            : {...state.classEngagementScores, ...scores},
+      );
+    } else if (scores.isNotEmpty) {
+      state = state.copyWith(classEngagementScores: {
+        ...state.classEngagementScores,
+        ...scores,
+      });
+    }
+  }
+
+  static String _scoreToCategory(int score) {
+    if (score >= 65) return 'engaged';
+    if (score >= 35) return 'distracted';
+    return 'flagged';
   }
 
   List<StudentWithClass> _buildAllStudents({String? teacherId}) {
@@ -194,13 +319,29 @@ class ClassesNotifier extends StateNotifier<ClassesState> {
         .toList();
   }
 
-  void setTab(ClassesTab tab) =>
-      state = state.copyWith(activeTab: tab, clearStatusFilter: true);
+  void setTab(ClassesTab tab) => state = state.copyWith(
+        activeTab: tab,
+        clearStatusFilter: true,
+        clearSubjectFilter: true,
+        clearClassroomFilter: true,
+      );
 
   void search(String query) => state = state.copyWith(searchQuery: query);
 
-  void setStatusFilter(String? filter) =>
-      state = state.copyWith(clearStatusFilter: filter == null, statusFilter: filter);
+  void setStatusFilter(String? filter) => state = state.copyWith(
+        clearStatusFilter: filter == null,
+        statusFilter: filter,
+      );
+
+  void setSubjectFilter(String? filter) => state = state.copyWith(
+        clearSubjectFilter: filter == null,
+        subjectFilter: filter,
+      );
+
+  void setClassroomFilter(String? filter) => state = state.copyWith(
+        clearClassroomFilter: filter == null,
+        classroomFilter: filter,
+      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

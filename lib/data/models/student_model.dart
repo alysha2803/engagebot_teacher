@@ -81,6 +81,11 @@ class StudentProfile {
   final int collaboration;
   final String droidInsight;
   final List<EngagementPoint> timeline;
+  // Droid analytics — populated from real session data
+  final Map<String, int> poseDistribution;
+  final Map<String, int> expressionDistribution;
+  final double avgEAR;
+  final double avgMAR;
 
   const StudentProfile({
     required this.id,
@@ -94,6 +99,10 @@ class StudentProfile {
     required this.collaboration,
     required this.droidInsight,
     required this.timeline,
+    this.poseDistribution = const {},
+    this.expressionDistribution = const {},
+    this.avgEAR = 0.0,
+    this.avgMAR = 0.0,
   });
 
   StudentProfile copyWith({
@@ -108,6 +117,10 @@ class StudentProfile {
     int? collaboration,
     String? droidInsight,
     List<EngagementPoint>? timeline,
+    Map<String, int>? poseDistribution,
+    Map<String, int>? expressionDistribution,
+    double? avgEAR,
+    double? avgMAR,
   }) =>
       StudentProfile(
         id: id ?? this.id,
@@ -121,6 +134,11 @@ class StudentProfile {
         collaboration: collaboration ?? this.collaboration,
         droidInsight: droidInsight ?? this.droidInsight,
         timeline: timeline ?? this.timeline,
+        poseDistribution: poseDistribution ?? this.poseDistribution,
+        expressionDistribution:
+            expressionDistribution ?? this.expressionDistribution,
+        avgEAR: avgEAR ?? this.avgEAR,
+        avgMAR: avgMAR ?? this.avgMAR,
       );
 
   factory StudentProfile.fromJson(Map<String, dynamic> json) => StudentProfile(

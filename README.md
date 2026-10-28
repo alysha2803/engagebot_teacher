@@ -90,7 +90,6 @@ and make sure it shows `emulator-5554 device` (not `offline`).
 ### Step 5 — Run the App
 
 ```bash
-flutter run
 ```
 
 If multiple devices are connected, specify the emulator explicitly:

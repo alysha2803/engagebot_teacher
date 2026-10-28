@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/app_colors.dart';
-import '../../data/mock/mock_data_service.dart';
 import '../../shared/widgets/engagebot_scaffold.dart';
 import '../../data/models/export_history_model.dart';
 import '../../shared/widgets/shared_widgets.dart';
+import '../dashboard/providers/dashboard_provider.dart';
 import 'providers/reports_provider.dart';
 
 /// Reports & Export — Tab 2.
@@ -35,44 +35,117 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     }
   }
 
-  // ── Class picker ─────────────────────────────────────────────────────────
+  // ── Classroom picker ─────────────────────────────────────────────────────
 
-  void _showClassPicker() {
-    final classes = MockDataService.getClasses();
+  void _showClassroomPicker() {
+    final classes = ref.read(dashboardProvider).classes;
     final current = ref.read(reportsProvider).selectedClass;
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (_) => _BottomSheet(
-        title: 'Select Class',
-        child: Column(
-          children: classes.map((cls) {
-            final label = '${cls.code} : ${cls.subject}';
-            final selected = label == current;
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                label,
-                style: TextStyle(
-                  fontWeight:
-                      selected ? FontWeight.w600 : FontWeight.normal,
-                  color: selected
-                      ? AppColors.primaryGreen
-                      : AppColors.textPrimary,
+        title: 'Select Classroom',
+        child: classes.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'No classes assigned yet.',
+                  style: TextStyle(color: AppColors.textSecondary),
                 ),
+              )
+            : Column(
+                children: classes.map((cls) {
+                  final selected = cls.code == current;
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      cls.code,
+                      style: TextStyle(
+                        fontWeight:
+                            selected ? FontWeight.w600 : FontWeight.normal,
+                        color: selected
+                            ? AppColors.primaryGreen
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      cls.subject,
+                      style:
+                          const TextStyle(color: AppColors.textSecondary),
+                    ),
+                    trailing: selected
+                        ? const Icon(Icons.check,
+                            color: AppColors.primaryGreen, size: 18)
+                        : null,
+                    onTap: () {
+                      ref
+                          .read(reportsProvider.notifier)
+                          .selectClass(cls.code);
+                      Navigator.pop(context);
+                    },
+                  );
+                }).toList(),
               ),
-              trailing: selected
-                  ? const Icon(Icons.check,
-                      color: AppColors.primaryGreen, size: 18)
-                  : null,
-              onTap: () {
-                ref.read(reportsProvider.notifier).selectClass(label);
-                Navigator.pop(context);
-              },
-            );
-          }).toList(),
-        ),
+      ),
+    );
+  }
+
+  // ── Subject picker ───────────────────────────────────────────────────────
+
+  void _showSubjectPicker() {
+    final classes = ref.read(dashboardProvider).classes;
+    final current = ref.read(reportsProvider).selectedSubject;
+    final subjects = classes
+        .map((c) => c.subject)
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _BottomSheet(
+        title: 'Select Subject',
+        child: subjects.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'No subjects found.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              )
+            : Column(
+                children: subjects.map((s) {
+                  final selected = s == current;
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      s,
+                      style: TextStyle(
+                        fontWeight:
+                            selected ? FontWeight.w600 : FontWeight.normal,
+                        color: selected
+                            ? AppColors.primaryGreen
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                    trailing: selected
+                        ? const Icon(Icons.check,
+                            color: AppColors.primaryGreen, size: 18)
+                        : null,
+                    onTap: () {
+                      ref
+                          .read(reportsProvider.notifier)
+                          .selectSubject(s);
+                      Navigator.pop(context);
+                    },
+                  );
+                }).toList(),
+              ),
       ),
     );
   }
@@ -81,6 +154,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
   void _showDateRangePicker() {
     const presets = [
+      'Today',
       'Last 7 Days',
       'Last 14 Days',
       'Last 30 Days',
@@ -92,6 +166,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (_) => _BottomSheet(
         title: 'Select Date Range',
         child: Column(
@@ -166,8 +241,43 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   // ── Generate export ──────────────────────────────────────────────────────
 
   Future<void> _generateExport(String type) async {
-    // Show generating dialog
     if (!mounted) return;
+
+    final notifier = ref.read(reportsProvider.notifier);
+    final isRealPdf = type == 'PDF' && notifier.canDownloadPdf;
+
+    if (isRealPdf) {
+      // Real PDF: skip the blocking dialog so the app stays visible when
+      // the Android share sheet opens. Show a non-blocking loading snackbar.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Generating PDF…'),
+            ],
+          ),
+          duration: const Duration(seconds: 30),
+          backgroundColor: AppColors.primaryGreen,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      await notifier.generateExport(type);
+      if (mounted) ScaffoldMessenger.of(context).clearSnackBars();
+      return;
+    }
+
+    // Non-PDF / mock path: show blocking dialog as usual.
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -188,7 +298,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              ref.read(reportsProvider).selectedClass,
+              ref.read(reportsProvider).scopeLabel,
               style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -199,9 +309,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       ),
     );
 
-    await ref.read(reportsProvider.notifier).generateExport(type);
+    await notifier.generateExport(type);
 
-    if (mounted) Navigator.of(context).pop(); // dismiss dialog
+    if (mounted) Navigator.of(context).pop();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -210,7 +320,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               const Icon(Icons.check_circle_outline,
                   color: Colors.white, size: 18),
               const SizedBox(width: 8),
-              Text('$type report generated and saved to History'),
+              Expanded(
+                child: Text('$type report generated and saved to History'),
+              ),
             ],
           ),
           backgroundColor: AppColors.primaryGreen,
@@ -220,177 +332,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         ),
       );
     }
-  }
-
-  // ── Edit schedule ────────────────────────────────────────────────────────
-
-  void _showEditSchedule() {
-    final state = ref.read(reportsProvider);
-    String selectedDay = state.scheduledDay;
-    String selectedTime = state.scheduledTime;
-    String selectedFormat = state.scheduledFormat;
-
-    const days = [
-      'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
-      'Sunday'
-    ];
-    const times = ['7:00 AM', '8:00 AM', '12:00 PM', '4:00 PM', '6:00 PM'];
-    const formats = ['PDF', 'CSV'];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setSheet) => _BottomSheet(
-          title: 'Edit Schedule',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Day
-              const _SheetLabel('Day'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: days.map((d) {
-                  final sel = d == selectedDay;
-                  return GestureDetector(
-                    onTap: () => setSheet(() => selectedDay = d),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: sel
-                            ? AppColors.primaryGreen
-                            : AppColors.backgroundLight,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        d.substring(0, 3),
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: sel ? Colors.white : AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Time
-              const _SheetLabel('Time'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: times.map((t) {
-                  final sel = t == selectedTime;
-                  return GestureDetector(
-                    onTap: () => setSheet(() => selectedTime = t),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: sel
-                            ? AppColors.primaryGreen
-                            : AppColors.backgroundLight,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        t,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: sel ? Colors.white : AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Format
-              const _SheetLabel('Format'),
-              const SizedBox(height: 8),
-              Row(
-                children: formats.map((f) {
-                  final sel = f == selectedFormat;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: GestureDetector(
-                      onTap: () => setSheet(() => selectedFormat = f),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: sel
-                              ? AppColors.primaryGreen
-                              : AppColors.backgroundLight,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          f,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color:
-                                sel ? Colors.white : AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              const SizedBox(height: 28),
-
-              // Save button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    ref.read(reportsProvider.notifier).updateSchedule(
-                          day: selectedDay,
-                          time: selectedTime,
-                          format: selectedFormat,
-                        );
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                            'Schedule updated: $selectedDay at $selectedTime ($selectedFormat)'),
-                        backgroundColor: AppColors.primaryGreen,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text('Save Schedule',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   // ── Share / download feedback ─────────────────────────────────────────────
@@ -493,21 +434,60 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Class selector
+                  // Report type selector
                   const Text(
-                    'Active Class Session',
+                    'Report Type',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textMuted,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  _FilterRow(
-                    icon: Icons.group_outlined,
-                    label: state.selectedClass,
-                    onTap: _showClassPicker,
+                  const SizedBox(height: 8),
+                  _ReportTypeSelector(
+                    selected: state.reportType,
+                    onSelect: notifier.selectReportType,
                   ),
+
+                  // Conditional scope picker
+                  if (state.reportType == ReportType.classroom) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Classroom',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    _FilterRow(
+                      icon: Icons.class_outlined,
+                      label: state.selectedClass.isEmpty
+                          ? 'Select a classroom'
+                          : state.selectedClass,
+                      onTap: _showClassroomPicker,
+                    ),
+                  ] else if (state.reportType == ReportType.subject) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Subject',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    _FilterRow(
+                      icon: Icons.book_outlined,
+                      label: state.selectedSubject.isEmpty
+                          ? 'Select a subject'
+                          : state.selectedSubject,
+                      onTap: _showSubjectPicker,
+                    ),
+                  ],
+
                   const SizedBox(height: 12),
                   const Divider(height: 1, color: AppColors.borderLight),
                   const SizedBox(height: 12),
@@ -570,144 +550,26 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               ],
             ),
 
-            const SizedBox(height: 16),
-
-            // ── Scheduled Summaries ──────────────────────────────────────
-            AppCard(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Column(
-                children: [
-                  GestureDetector(
-                    onTap: notifier.toggleScheduled,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 34,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: AppColors.backgroundLight,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.schedule,
-                              size: 18,
-                              color: AppColors.textSecondary),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Scheduled Summaries',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              Text(
-                                state.scheduledSummaryLabel,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textMuted,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        AnimatedRotation(
-                          turns: state.scheduledExpanded ? 0.5 : 0,
-                          duration: const Duration(milliseconds: 200),
-                          child: const Icon(Icons.keyboard_arrow_down,
-                              color: AppColors.textMuted),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Expandable detail
-                  AnimatedCrossFade(
-                    duration: const Duration(milliseconds: 200),
-                    crossFadeState: state.scheduledExpanded
-                        ? CrossFadeState.showSecond
-                        : CrossFadeState.showFirst,
-                    firstChild: const SizedBox.shrink(),
-                    secondChild: Padding(
-                      padding: const EdgeInsets.only(top: 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Divider(
-                              height: 1, color: AppColors.borderLight),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Your scheduled ${state.scheduledFormat} summary is generated every ${state.scheduledDay} at ${state.scheduledTime} and sent to your registered email.',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                              height: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              OutlinedButton(
-                                onPressed: _showEditSchedule,
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                      color: AppColors.primaryGreen),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  foregroundColor: AppColors.primaryGreen,
-                                ),
-                                child: const Text('Edit Schedule',
-                                    style: TextStyle(fontSize: 13)),
-                              ),
-                              const SizedBox(width: 10),
-                              OutlinedButton(
-                                onPressed: () => _generateExport(
-                                    state.scheduledFormat),
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                      color: AppColors.borderLight),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  foregroundColor: AppColors.textSecondary,
-                                ),
-                                child: const Text('Run Now',
-                                    style: TextStyle(fontSize: 13)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
             const SizedBox(height: 24),
 
             // ── History ──────────────────────────────────────────────────
             SectionHeader(
               key: _historyKey,
               title: 'HISTORY',
-              trailing: TextButton(
-                onPressed: notifier.toggleShowAll,
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primaryGreen,
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                ),
-                child: Text(
-                  state.showAllHistory ? 'Show Less' : 'View All',
-                  style: const TextStyle(fontSize: 13),
-                ),
-              ),
+              trailing: state.allHistory.isNotEmpty
+                  ? TextButton(
+                      onPressed: notifier.toggleShowAll,
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primaryGreen,
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                      ),
+                      child: Text(
+                        state.showAllHistory ? 'Show Less' : 'View All',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    )
+                  : null,
             ),
             const SizedBox(height: 12),
 
@@ -801,61 +663,51 @@ class _BottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+    final bottomPad = MediaQuery.of(context).viewInsets.bottom + 32;
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
-      padding: EdgeInsets.fromLTRB(
-          20, 12, 20, MediaQuery.of(context).viewInsets.bottom + 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Theme.of(context).dividerColor,
-                borderRadius: BorderRadius.circular(2),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: EdgeInsets.fromLTRB(20, 12, 20, bottomPad),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).dividerColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.onSurface,
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          child,
-        ],
+            const SizedBox(height: 8),
+            Flexible(
+              child: SingleChildScrollView(
+                child: child,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sheet label helper
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _SheetLabel extends StatelessWidget {
-  final String text;
-  const _SheetLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) => Text(
-        text,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-        ),
-      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -888,6 +740,8 @@ class _FilterRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textPrimary,
@@ -972,6 +826,89 @@ class _ExportCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Report type selector — three tappable options in a row
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ReportTypeSelector extends StatelessWidget {
+  final ReportType selected;
+  final void Function(ReportType) onSelect;
+
+  const _ReportTypeSelector({
+    required this.selected,
+    required this.onSelect,
+  });
+
+  static const _options = [
+    (ReportType.overall, Icons.bar_chart_outlined, 'Overall'),
+    (ReportType.classroom, Icons.class_outlined, 'By Classroom'),
+    (ReportType.subject, Icons.book_outlined, 'By Subject'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: _options.map((opt) {
+        final (type, icon, label) = opt;
+        final isSelected = selected == type;
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(
+              right: type != ReportType.subject ? 8 : 0,
+            ),
+            child: GestureDetector(
+              onTap: () => onSelect(type),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.primaryGreen
+                      : AppColors.backgroundLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected
+                        ? AppColors.primaryGreen
+                        : AppColors.borderLight,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      icon,
+                      size: 18,
+                      color: isSelected
+                          ? Colors.white
+                          : AppColors.textSecondary,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.normal,
+                        color: isSelected
+                            ? Colors.white
+                            : AppColors.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

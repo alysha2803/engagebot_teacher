@@ -106,7 +106,6 @@ class ProfileHeaderCard extends StatelessWidget {
 // Engagement Timeline Card (fl_chart)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// TODO: Replace with droid live engagement stream
 class EngagementTimelineCard extends StatelessWidget {
   final List<EngagementPoint> timeline;
 
@@ -114,142 +113,462 @@ class EngagementTimelineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spots = timeline.asMap().entries.map((e) {
-      return FlSpot(e.key.toDouble(), e.value.value);
-    }).toList();
-
     final borderColor = context.colorBorder;
     final mutedColor = context.colorMuted;
+
+    // Need at least 2 points to draw a line.
+    final points = timeline.length >= 2 ? timeline : <EngagementPoint>[];
+    final spots = points.asMap().entries
+        .map((e) => FlSpot(e.key.toDouble(), e.value.value))
+        .toList();
+
+    // Show a label every ~12 samples (≈ 1 minute at 5s interval).
+    final labelStep = (points.length / 6).ceil().clamp(1, 999);
 
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Engagement Timeline',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: context.colorOnCard,
+          Text(
+            'Engagement Timeline',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: context.colorOnCard,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            points.isEmpty
+                ? 'No session data recorded yet'
+                : 'Latest session · ${points.length} samples',
+            style: TextStyle(fontSize: 12, color: context.colorSubtle),
+          ),
+          const SizedBox(height: 16),
+
+          if (points.isEmpty)
+            SizedBox(
+              height: 100,
+              child: Center(
+                child: Text(
+                  'Run a droid session to see the timeline',
+                  style: TextStyle(color: context.colorMuted, fontSize: 13),
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 160,
+              child: LineChart(
+                LineChartData(
+                  minY: 0,
+                  maxY: 100,
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: 25,
+                    getDrawingHorizontalLine: (_) =>
+                        FlLine(color: borderColor, strokeWidth: 1),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        interval: 25,
+                        reservedSize: 30,
+                        getTitlesWidget: (v, _) => Text(
+                          v.toInt().toString(),
+                          style: TextStyle(fontSize: 10, color: mutedColor),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      "Today's Session Activity",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.colorSubtle,
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 22,
+                        getTitlesWidget: (value, _) {
+                          final idx = value.toInt();
+                          if (idx < 0 ||
+                              idx >= points.length ||
+                              idx % labelStep != 0) {
+                            return const SizedBox.shrink();
+                          }
+                          return Text(
+                            points[idx].timeLabel,
+                            style: TextStyle(fontSize: 9, color: mutedColor),
+                          );
+                        },
+                      ),
+                    ),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: spots,
+                      isCurved: true,
+                      color: AppColors.primaryGreen,
+                      barWidth: 2.5,
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            AppColors.primaryGreen.withValues(alpha: 0.25),
+                            AppColors.primaryGreen.withValues(alpha: 0.02),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.primaryGreen),
-                  borderRadius: BorderRadius.circular(20),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Engagement Level Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class EngagementLevelCard extends StatelessWidget {
+  final int avgEngagement;
+  final String engagementLabel;
+
+  const EngagementLevelCard({
+    super.key,
+    required this.avgEngagement,
+    required this.engagementLabel,
+  });
+
+  Color _levelColor() {
+    if (avgEngagement >= 65) return AppColors.successGreen;
+    if (avgEngagement >= 35) return AppColors.warningAmber;
+    return AppColors.liveRed;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final col = _levelColor();
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          // Big percentage circle
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: col.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                '$avgEngagement%',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: col,
                 ),
-                child: const Text(
-                  'Live Session',
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Engagement Level',
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryGreen,
+                    fontSize: 12,
+                    color: context.colorSubtle,
                   ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  engagementLabel,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: context.colorOnCard,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: avgEngagement / 100,
+                    backgroundColor: context.colorBorder,
+                    valueColor: AlwaysStoppedAnimation<Color>(col),
+                    minHeight: 5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Session Analytics Card — pose, expression, EAR, MAR
+// ─────────────────────────────────────────────────────────────────────────────
+
+class SessionAnalyticsCard extends StatelessWidget {
+  final Map<String, int> poseDistribution;
+  final Map<String, int> expressionDistribution;
+  final double avgEAR;
+  final double avgMAR;
+
+  const SessionAnalyticsCard({
+    super.key,
+    required this.poseDistribution,
+    required this.expressionDistribution,
+    required this.avgEAR,
+    required this.avgMAR,
+  });
+
+  static const _poseOrder = ['forward', 'down', 'side', 'away'];
+  static const _exprOrder = ['attentive', 'neutral', 'drowsy', 'yawning'];
+
+  static const _poseLabel = {
+    'forward': 'Looking Forward',
+    'down': 'Looking Down',
+    'side': 'Looking Side',
+    'away': 'Looking Away',
+  };
+  static const _exprLabel = {
+    'attentive': 'Attentive',
+    'neutral': 'Neutral',
+    'drowsy': 'Drowsy',
+    'yawning': 'Yawning',
+  };
+
+  Color _poseColor(String pose) => switch (pose) {
+        'forward' => AppColors.successGreen,
+        'down' => AppColors.warningAmber,
+        'side' => const Color(0xFFED8936),
+        _ => AppColors.liveRed,
+      };
+
+  Color _exprColor(String expr) => switch (expr) {
+        'attentive' => AppColors.successGreen,
+        'neutral' => AppColors.primaryGreen,
+        'drowsy' => AppColors.warningAmber,
+        _ => AppColors.liveRed,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final earLabel = avgEAR >= 0.28
+        ? 'Eyes Open'
+        : avgEAR >= 0.22
+            ? 'Partially Closed'
+            : 'Drowsy';
+    final marLabel = avgMAR >= 0.5
+        ? 'Yawning'
+        : avgMAR >= 0.25
+            ? 'Mouth Open'
+            : 'Normal';
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Session Analytics',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: context.colorOnCard,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Head Pose
+          Text(
+            'HEAD POSE',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: context.colorMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ..._poseOrder
+              .where((k) => (poseDistribution[k] ?? 0) > 0)
+              .map((k) => _AnalyticsBar(
+                    label: _poseLabel[k] ?? k,
+                    value: poseDistribution[k] ?? 0,
+                    color: _poseColor(k),
+                  )),
+
+          const SizedBox(height: 14),
+
+          // Expression
+          Text(
+            'FACIAL EXPRESSION',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: context.colorMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ..._exprOrder
+              .where((k) => (expressionDistribution[k] ?? 0) > 0)
+              .map((k) => _AnalyticsBar(
+                    label: _exprLabel[k] ?? k,
+                    value: expressionDistribution[k] ?? 0,
+                    color: _exprColor(k),
+                  )),
+
+          const SizedBox(height: 14),
+
+          // EAR / MAR row
+          Text(
+            'EYE & MOUTH',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: context.colorMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _MetricPill(
+                  label: 'Avg EAR',
+                  value: avgEAR.toStringAsFixed(2),
+                  sub: earLabel,
+                  color: avgEAR >= 0.22
+                      ? AppColors.successGreen
+                      : AppColors.warningAmber,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _MetricPill(
+                  label: 'Avg MAR',
+                  value: avgMAR.toStringAsFixed(2),
+                  sub: marLabel,
+                  color: avgMAR < 0.5
+                      ? AppColors.successGreen
+                      : AppColors.liveRed,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+}
 
+class _AnalyticsBar extends StatelessWidget {
+  final String label;
+  final int value;
+  final Color color;
+
+  const _AnalyticsBar({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
           SizedBox(
-            height: 160,
-            child: LineChart(
-              LineChartData(
-                minY: 0,
-                maxY: 100,
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: 25,
-                  getDrawingHorizontalLine: (_) => FlLine(
-                    color: borderColor,
-                    strokeWidth: 1,
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: 25,
-                      reservedSize: 30,
-                      getTitlesWidget: (value, meta) => Text(
-                        value.toInt().toString(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: mutedColor,
-                        ),
-                      ),
-                    ),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 22,
-                      getTitlesWidget: (value, meta) {
-                        final idx = value.toInt();
-                        if (idx < 0 || idx >= timeline.length) {
-                          return const SizedBox.shrink();
-                        }
-                        return Text(
-                          timeline[idx].timeLabel,
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: mutedColor,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                ),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    color: AppColors.primaryGreen,
-                    barWidth: 2.5,
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          AppColors.primaryGreen.withValues(alpha: 0.25),
-                          AppColors.primaryGreen.withValues(alpha: 0.02),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 12, color: context.colorSubtle),
+            ),
+          ),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: value / 100,
+                backgroundColor: context.colorBorder,
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+                minHeight: 8,
               ),
             ),
           ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 36,
+            child: Text(
+              '$value%',
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricPill extends StatelessWidget {
+  final String label;
+  final String value;
+  final String sub;
+  final Color color;
+
+  const _MetricPill({
+    required this.label,
+    required this.value,
+    required this.sub,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: TextStyle(fontSize: 10, color: context.colorMuted)),
+          const SizedBox(height: 2),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: color)),
+          Text(sub,
+              style: TextStyle(fontSize: 10, color: context.colorSubtle)),
         ],
       ),
     );
@@ -357,16 +676,10 @@ class _MetricChip extends StatelessWidget {
 // Droid Insight Card
 // ─────────────────────────────────────────────────────────────────────────────
 
-// TODO: Replace with droid insight API
 class DroidInsightCard extends StatelessWidget {
   final String insightText;
-  final VoidCallback? onApply;
 
-  const DroidInsightCard({
-    super.key,
-    required this.insightText,
-    this.onApply,
-  });
+  const DroidInsightCard({super.key, required this.insightText});
 
   @override
   Widget build(BuildContext context) {
@@ -391,8 +704,7 @@ class DroidInsightCard extends StatelessWidget {
                   color: AppColors.primaryGreen,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.bolt,
-                    color: Colors.white, size: 18),
+                child: const Icon(Icons.bolt, color: Colors.white, size: 18),
               ),
               const SizedBox(width: 10),
               Text(
@@ -406,7 +718,6 @@ class DroidInsightCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-
           Text(
             '"$insightText"',
             style: TextStyle(
@@ -414,27 +725,6 @@ class DroidInsightCard extends StatelessWidget {
               fontStyle: FontStyle.italic,
               color: context.colorSubtle,
               height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: onApply,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primaryGreen,
-                side: const BorderSide(color: AppColors.primaryGreen),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              child: const Text(
-                'Apply Interaction Tip',
-                style:
-                    TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
             ),
           ),
         ],
