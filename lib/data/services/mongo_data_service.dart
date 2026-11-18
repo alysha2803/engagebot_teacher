@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import '../mock/mock_data_service.dart';
 import '../models/class_model.dart';
 import '../models/student_model.dart';
 import '../models/teacher_profile_model.dart';
@@ -8,20 +7,34 @@ import 'api_service.dart';
 abstract final class MongoDataService {
   // ── Internal helper ────────────────────────────────────────────────────────
 
+  /// Message from the most recent failed request, or null after a success.
+  /// Screens show it instead of silently falling back to sample data.
+  static String? lastError;
+
+  static const _unreachable =
+      "Can't reach the EngageBot server. Check that the phone is on the same "
+      'network as the server and that the server is running.';
+
+  /// Runs [fetch]. On failure, records [lastError] and returns [empty] —
+  /// never sample data, so a connection problem can't look like real classes.
+  /// 401/403 are rethrown so auth handling still sees them.
   static Future<T> _withFallback<T>(
     Future<T?> Function() fetch,
-    T Function() fallback,
+    T Function() empty,
   ) async {
     try {
       final result = await fetch();
-      return result ?? fallback();
+      lastError = null;
+      return result ?? empty();
     } on DioException catch (e) {
       if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
         rethrow;
       }
-      return fallback();
+      lastError = e.response == null ? _unreachable : (e.message ?? _unreachable);
+      return empty();
     } catch (_) {
-      return fallback();
+      lastError = _unreachable;
+      return empty();
     }
   }
 
@@ -42,7 +55,8 @@ abstract final class MongoDataService {
             'avatarUrl': data['avatarUrl'] ?? '',
           });
         },
-        MockDataService.getTeacherProfile,
+        () => const TeacherProfileModel(
+              name: '', school: '', subject: '', avatarUrl: ''),
       );
 
   static Future<void> updateTeacherName(String name) async {
@@ -85,8 +99,20 @@ abstract final class MongoDataService {
           classes.sort((a, b) => a.code.compareTo(b.code));
           return classes;
         },
-        () => MockDataService.getClassesForTeacher(teacherId),
+        () => <ClassModel>[],
       );
+
+  // ── Teacher check-in (clears the "late" alert on the admin dashboard) ─────
+
+  /// Checks the teacher in to one of their scheduled lessons.
+  /// Returns the updated schedule entry. Throws with a readable message on failure.
+  static Future<Map<String, dynamic>> checkIn(String scheduleId) async {
+    try {
+      return await ApiService.checkInSchedule(scheduleId);
+    } on DioException catch (e) {
+      throw ApiException(e.response == null ? _unreachable : (e.message ?? 'Check-in failed'));
+    }
+  }
 
   // ── Write — update a student (name only) ──────────────────────────────────
 
@@ -129,7 +155,7 @@ abstract final class MongoDataService {
           }
           return students;
         },
-        () => MockDataService.getAllStudentsWithClassForTeacher(teacherId),
+        () => <StudentModel>[],
       );
 
   // ── Roster for a single class ──────────────────────────────────────────────
@@ -150,7 +176,7 @@ abstract final class MongoDataService {
                 'statusNote': d['statusNote'],
               })).toList();
         },
-        () => MockDataService.getRosterForClassByTeacher(classCode, teacherId),
+        () => <StudentModel>[],
       );
 
   // ── Live session (droid data) ──────────────────────────────────────────────

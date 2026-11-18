@@ -3,10 +3,18 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 
+/// Checks the teacher in to a lesson. Returns null on success or an error message.
+typedef CheckInCallback = Future<String?> Function(String scheduleId);
+
 class WeeklyScheduleSection extends StatefulWidget {
   final List<Map<String, dynamic>> schedules;
+  final CheckInCallback? onCheckIn;
 
-  const WeeklyScheduleSection({super.key, required this.schedules});
+  const WeeklyScheduleSection({
+    super.key,
+    required this.schedules,
+    this.onCheckIn,
+  });
 
   @override
   State<WeeklyScheduleSection> createState() => _WeeklyScheduleSectionState();
@@ -147,6 +155,7 @@ class _WeeklyScheduleSectionState extends State<WeeklyScheduleSection> {
                 return _ScheduleTile(
                   schedule: entry.value,
                   isLast: entry.key == filtered.length - 1,
+                  onCheckIn: widget.onCheckIn,
                 );
               }).toList(),
             ),
@@ -347,8 +356,26 @@ class _DropdownSheet extends StatelessWidget {
 class _ScheduleTile extends StatelessWidget {
   final Map<String, dynamic> schedule;
   final bool isLast;
+  final CheckInCallback? onCheckIn;
 
-  const _ScheduleTile({required this.schedule, required this.isLast});
+  const _ScheduleTile({
+    required this.schedule,
+    required this.isLast,
+    this.onCheckIn,
+  });
+
+  static const _weekdays = [
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+  ];
+
+  /// True while "HH:MM" [endTime] is still ahead of the current time.
+  static bool _notEnded(String endTime) {
+    final parts = endTime.split(':');
+    if (parts.length < 2) return true;
+    final end = (int.tryParse(parts[0]) ?? 23) * 60 + (int.tryParse(parts[1]) ?? 59);
+    final now = DateTime.now();
+    return now.hour * 60 + now.minute < end;
+  }
 
   Color _subjectColor(String subject) {
     const colors = {
@@ -376,6 +403,16 @@ class _ScheduleTile extends StatelessWidget {
     final status = schedule['status'] as String? ?? '';
     final color = _subjectColor(subject);
     final isOngoing = status == 'ongoing';
+    final id = schedule['id'] as String? ?? '';
+    final isToday =
+        day.toLowerCase() == _weekdays[DateTime.now().weekday - 1];
+    final checkedIn = schedule['checkedIn'] == true;
+    final checkInTime = schedule['checkInTime'] as String? ?? '';
+    final canCheckIn = onCheckIn != null &&
+        id.isNotEmpty &&
+        isToday &&
+        !checkedIn &&
+        _notEnded(endTime);
 
     return InkWell(
       onTap: classGroup.isNotEmpty
@@ -468,6 +505,26 @@ class _ScheduleTile extends StatelessWidget {
             ),
           ),
 
+          // Check-in (today's lessons only) — clears the admin's "late" alert
+          if (canCheckIn)
+            _CheckInButton(scheduleId: id, onCheckIn: onCheckIn!)
+          else if (isToday && checkedIn && checkInTime.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.check_circle,
+                      size: 14, color: AppColors.primaryGreen),
+                  const SizedBox(width: 4),
+                  Text(
+                    checkInTime,
+                    style: TextStyle(fontSize: 11, color: context.colorMuted),
+                  ),
+                ],
+              ),
+            ),
+
           // Ongoing badge
           if (isOngoing)
             Container(
@@ -488,6 +545,59 @@ class _ScheduleTile extends StatelessWidget {
             ),
         ],
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Check-in button for one of today's lessons
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CheckInButton extends StatefulWidget {
+  final String scheduleId;
+  final CheckInCallback onCheckIn;
+
+  const _CheckInButton({required this.scheduleId, required this.onCheckIn});
+
+  @override
+  State<_CheckInButton> createState() => _CheckInButtonState();
+}
+
+class _CheckInButtonState extends State<_CheckInButton> {
+  bool _busy = false;
+
+  Future<void> _checkIn() async {
+    setState(() => _busy = true);
+    final error = await widget.onCheckIn(widget.scheduleId);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(error ?? 'Checked in')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: FilledButton(
+        onPressed: _busy ? null : _checkIn,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.primaryGreen,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          minimumSize: const Size(0, 32),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+        child: _busy
+            ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+            : const Text('Check in'),
       ),
     );
   }

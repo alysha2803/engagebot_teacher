@@ -81,6 +81,15 @@ class ApiService {
     return res.data!;
   }
 
+  /// Marks one of the teacher's own lessons as checked in. Checking in again
+  /// keeps the first check-in time (the server decides).
+  static Future<Map<String, dynamic>> checkInSchedule(String scheduleId) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/schedules/${Uri.encodeComponent(scheduleId)}/check-in',
+    );
+    return res.data!;
+  }
+
   // ── Students ────────────────────────────────────────────────────────────────
 
   static Future<List<dynamic>> getStudents({String? classGroup}) async {

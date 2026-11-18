@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../data/mock/mock_data_service.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/services/mongo_data_service.dart';
@@ -30,6 +29,8 @@ class DashboardState {
   // True after the first successful API fetch — distinguishes "API returned
   // empty" from "still waiting for the first response".
   final bool hasLoadedFromApi;
+  // Set when the last refresh could not reach the server; null otherwise.
+  final String? errorMessage;
 
   const DashboardState({
     required this.liveEngagement,
@@ -40,6 +41,7 @@ class DashboardState {
     this.schedules = const [],
     this.isLoading = false,
     this.hasLoadedFromApi = false,
+    this.errorMessage,
   });
 
   DashboardState copyWith({
@@ -51,6 +53,8 @@ class DashboardState {
     List<Map<String, dynamic>>? schedules,
     bool? isLoading,
     bool? hasLoadedFromApi,
+    String? errorMessage,
+    bool clearError = false,
   }) =>
       DashboardState(
         liveEngagement: liveEngagement ?? this.liveEngagement,
@@ -61,6 +65,7 @@ class DashboardState {
         schedules: schedules ?? this.schedules,
         isLoading: isLoading ?? this.isLoading,
         hasLoadedFromApi: hasLoadedFromApi ?? this.hasLoadedFromApi,
+        errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       );
 }
 
@@ -69,12 +74,12 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
   Timer? _refreshTimer;
 
   DashboardNotifier(this._ref)
-      : super(DashboardState(
-          liveEngagement: MockDataService.getLiveEngagement(),
-          classes: MockDataService.getClasses(),
+      : super(const DashboardState(
+          liveEngagement: noSession,
+          classes: [],
           selectedClassIndex: 0,
-          roster: MockDataService.getRosterForClass('1 USAHA'),
-          aiRecommendation: MockDataService.getAIRecommendation(),
+          roster: [],
+          aiRecommendation: {},
         )) {
     // Listen for sign-in events that occur after this notifier is created.
     _ref.listen<String?>(currentTeacherIdProvider, (_, next) {
@@ -94,6 +99,15 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       }
     });
   }
+
+  /// Shown when no droid session exists today for the selected class.
+  static const Map<String, dynamic> noSession = {
+    'percentage': 0,
+    'trend': '',
+    'sessionMinutes': 0,
+    'droidStatus': 'IDLE',
+    'sessionState': 'none',
+  };
 
   void _startPeriodicRefresh(String teacherId) {
     _refreshTimer?.cancel();
@@ -126,6 +140,8 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
     final classes = await classesFuture;
     final schedules = await schedulesFuture;
     if (!mounted) return;
+    // Read now: a later request that succeeds would clear lastError.
+    final classesError = MongoDataService.lastError;
 
     final classCode = classes.isNotEmpty ? classes[0].code : '';
 
@@ -138,16 +154,42 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
     final liveSession = await liveFuture;
     if (!mounted) return;
 
+    final error = classesError ?? MongoDataService.lastError;
     state = state.copyWith(
       classes: classes,
       schedules: schedules,
       roster: _applyEdits(roster),
       selectedClassIndex: 0,
       liveEngagement:
-          liveSession != null ? _mapLiveSession(liveSession) : state.liveEngagement,
+          liveSession != null ? _mapLiveSession(liveSession) : noSession,
       isLoading: false,
       hasLoadedFromApi: true,
+      errorMessage: error,
+      clearError: error == null,
     );
+  }
+
+  /// Re-runs the refresh for the signed-in teacher (the "Try again" button).
+  Future<void> retry() async {
+    final id = _ref.read(currentTeacherIdProvider) ?? '';
+    if (id.isNotEmpty) await refreshFromFirebase(id);
+  }
+
+  /// Checks the teacher in to a scheduled lesson and updates it in place.
+  /// Returns null on success, or a message to show on failure.
+  Future<String?> checkIn(String scheduleId) async {
+    try {
+      final updated = await MongoDataService.checkIn(scheduleId);
+      if (!mounted) return null;
+      state = state.copyWith(
+        schedules: state.schedules
+            .map((s) => s['id'] == scheduleId ? {...s, ...updated} : s)
+            .toList(),
+      );
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
   }
 
   static Map<String, dynamic> _mapLiveSession(Map<String, dynamic> report) {
@@ -168,9 +210,6 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       }
     }
 
-    // Simple trend label derived from score.
-    final diff = score - 70;
-    final trend = diff >= 0 ? '+$diff%' : '$diff%';
 
     final droidStatus = switch (engagement) {
       'high' => 'ENGAGED',
@@ -180,11 +219,14 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       _ => report['status'] == 'in_progress' ? 'MONITORING' : 'IDLE',
     };
 
+    final isLive = report['status'] == 'in_progress';
     return {
       'percentage': score,
-      'trend': trend,
-      'sessionMinutes': minutes,
+      // No real comparison figure exists yet, so no trend is shown.
+      'trend': '',
+      'sessionMinutes': isLive ? minutes : 0,
       'droidStatus': droidStatus,
+      'sessionState': isLive ? 'live' : 'ended',
     };
   }
 
@@ -195,7 +237,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 
     final baseRoster = teacherId.isNotEmpty
         ? await MongoDataService.getRosterWithEngagement(classCode, teacherId)
-        : MockDataService.getRosterForClass(classCode);
+        : <StudentModel>[];
 
     if (!mounted) return;
     state = state.copyWith(

@@ -5,6 +5,7 @@ import '../../app/theme/app_colors.dart';
 import '../../data/mock/mock_data_service.dart';
 import '../../data/models/analytics_models.dart';
 import '../../shared/widgets/engagebot_scaffold.dart';
+import '../../shared/widgets/shared_widgets.dart';
 import 'providers/dashboard_provider.dart';
 import 'widgets/live_session_card.dart';
 import 'widgets/weekly_schedule_section.dart';
@@ -60,13 +61,23 @@ class DashboardScreen extends ConsumerWidget {
       body: !state.hasLoadedFromApi
           ? const Center(child: CircularProgressIndicator())
           : state.classes.isEmpty
-              ? _NoClassesView()
+              ? (state.errorMessage != null
+                  ? ConnectionErrorView(
+                      message: state.errorMessage!,
+                      onRetry: () => ref.read(dashboardProvider.notifier).retry(),
+                    )
+                  : _NoClassesView())
               : SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 20),
+
+                      if (state.errorMessage != null) ...[
+                        ConnectionErrorBanner(message: state.errorMessage!),
+                        const SizedBox(height: 16),
+                      ],
 
                       // ── Live Session Card ──────────────────────────────────────────
                       LiveSessionCard(
@@ -78,12 +89,19 @@ class DashboardScreen extends ConsumerWidget {
                             state.liveEngagement['droidStatus'] as String,
                         period: _currentPeriod(),
                         hasClasses: true,
+                        sessionState: state.liveEngagement['sessionState']
+                                as String? ??
+                            'none',
                       ),
 
                       const SizedBox(height: 24),
 
                       // ── Weekly Schedule ────────────────────────────────────────────
-                      WeeklyScheduleSection(schedules: state.schedules),
+                      WeeklyScheduleSection(
+                        schedules: state.schedules,
+                        onCheckIn: (id) =>
+                            ref.read(dashboardProvider.notifier).checkIn(id),
+                      ),
 
                       const SizedBox(height: 20),
 
@@ -290,7 +308,7 @@ class _TeachingRecommendationsSheetState
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Personalised for today\'s session · tap Apply to mark as used',
+                    'General classroom tips · not yet based on your class data',
                     style: TextStyle(fontSize: 12, color: context.colorMuted),
                   ),
                 ],
