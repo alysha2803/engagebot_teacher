@@ -145,6 +145,21 @@ class ApiService {
     return res.data ?? {};
   }
 
+  /// The single most recent report for a class, regardless of status or
+  /// "today" -- timezone-independent, unlike filtering by the device's own
+  /// local date. Returns null if the class has no reports yet (404).
+  static Future<Map<String, dynamic>?> getLatestReportForClass(String classGroup) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/reports/class/${Uri.encodeComponent(classGroup)}/latest',
+      );
+      return res.data;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
   // ── Generic GET helper ───────────────────────────────────────────────────────
 
   static Future<T> get<T>(String path) async {

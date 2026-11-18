@@ -182,26 +182,14 @@ abstract final class MongoDataService {
   // ── Live session (droid data) ──────────────────────────────────────────────
 
   static Future<Map<String, dynamic>?> getLiveSession(String classGroup) async {
+    if (classGroup.isEmpty) return null;
     try {
-      final now = DateTime.now();
-      final date =
-          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-      final reports = await ApiService.getSessionReports(date);
-      if (reports.isEmpty) return null;
-
-      final forClass = classGroup.isEmpty
-          ? reports
-          : reports
-              .where((r) => (r['classGroup'] as String?) == classGroup)
-              .toList();
-
-      if (forClass.isEmpty) return null;
-
-      final inProgress = forClass
-          .where((r) => (r['status'] as String?) == 'in_progress')
-          .toList();
-      return (inProgress.isNotEmpty ? inProgress.last : forClass.last)
-          as Map<String, dynamic>;
+      // The single most recent report for this class, full stop -- not
+      // "today's reports" filtered by the device's own local clock, which
+      // silently picks the wrong report when the test device's timezone
+      // disagrees with the server/droid's (e.g. an emulator defaulting to
+      // UTC while reports are timestamped in Malaysia time).
+      return await ApiService.getLatestReportForClass(classGroup);
     } catch (_) {
       return null;
     }
