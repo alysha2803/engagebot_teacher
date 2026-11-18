@@ -81,6 +81,15 @@ class ApiService {
     return res.data!;
   }
 
+  /// Marks one of the teacher's own lessons as checked in. Checking in again
+  /// keeps the first check-in time (the server decides).
+  static Future<Map<String, dynamic>> checkInSchedule(String scheduleId) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/schedules/${Uri.encodeComponent(scheduleId)}/check-in',
+    );
+    return res.data!;
+  }
+
   // ── Students ────────────────────────────────────────────────────────────────
 
   static Future<List<dynamic>> getStudents({String? classGroup}) async {
@@ -134,6 +143,21 @@ class ApiService {
       queryParameters: date != null ? {'date': date} : null,
     );
     return res.data ?? {};
+  }
+
+  /// The single most recent report for a class, regardless of status or
+  /// "today" -- timezone-independent, unlike filtering by the device's own
+  /// local date. Returns null if the class has no reports yet (404).
+  static Future<Map<String, dynamic>?> getLatestReportForClass(String classGroup) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/reports/class/${Uri.encodeComponent(classGroup)}/latest',
+      );
+      return res.data;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
   }
 
   // ── Generic GET helper ───────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../shared/widgets/engagebot_scaffold.dart';
+import '../../shared/widgets/shared_widgets.dart';
 import 'providers/classes_provider.dart';
 import 'widgets/classes_widgets.dart';
 
@@ -134,6 +135,11 @@ class ClassesScreen extends ConsumerWidget {
             ),
 
             const SizedBox(height: 20),
+
+            if (state.errorMessage != null) ...[
+              ConnectionErrorBanner(message: state.errorMessage!),
+              const SizedBox(height: 16),
+            ],
 
             // ── Content switches by tab ────────────────────────────────────
             if (state.isLoading)

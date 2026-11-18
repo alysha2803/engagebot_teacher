@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../data/mock/mock_data_service.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/student_model.dart';
 import '../../../data/services/mongo_data_service.dart';
@@ -38,6 +37,8 @@ class ClassesState {
   final String? subjectFilter;
   final String? classroomFilter;
   final bool isLoading;
+  /// Set when the last refresh could not reach the server; null otherwise.
+  final String? errorMessage;
 
   const ClassesState({
     required this.classes,
@@ -49,6 +50,7 @@ class ClassesState {
     this.subjectFilter,
     this.classroomFilter,
     this.isLoading = false,
+    this.errorMessage,
   });
 
   // ── Periods tab ────────────────────────────────────────────────────────────
@@ -128,6 +130,8 @@ class ClassesState {
     bool clearSubjectFilter = false,
     bool clearClassroomFilter = false,
     bool? isLoading,
+    String? errorMessage,
+    bool clearError = false,
   }) =>
       ClassesState(
         classes: classes ?? this.classes,
@@ -143,6 +147,7 @@ class ClassesState {
             ? null
             : (classroomFilter ?? this.classroomFilter),
         isLoading: isLoading ?? this.isLoading,
+        errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       );
 }
 
@@ -154,25 +159,16 @@ class ClassesNotifier extends StateNotifier<ClassesState> {
   final Ref _ref;
 
   ClassesNotifier(this._ref)
-      : super(ClassesState(
-          classes: MockDataService.getClassesForTeacher(
-              _ref.read(currentTeacherIdProvider) ?? ''),
-          allStudents: [],
-        )) {
-    // Build initial student list from mock immediately (no wait).
-    state = state.copyWith(allStudents: _buildAllStudents());
-
+      : super(const ClassesState(classes: [], allStudents: [])) {
     // Re-initialise when the teacher signs in or changes account.
+    // Starts empty; only real data from the API is ever shown.
     _ref.listen<String?>(currentTeacherIdProvider, (_, next) {
       final teacherId = next ?? '';
-      state = state.copyWith(
-        classes: MockDataService.getClassesForTeacher(teacherId),
-        allStudents: _buildAllStudents(teacherId: teacherId),
-      );
+      state = state.copyWith(classes: const [], allStudents: const [], clearError: true);
       if (teacherId.isNotEmpty) refreshFromFirebase(teacherId);
     });
 
-    // Apply edits on top of the current (real or mock) student list.
+    // Apply edits on top of the current student list.
     _ref.listen<Map<String, StudentModel>>(
       studentEditsProvider,
       (_, edits) {
@@ -211,10 +207,13 @@ class ClassesNotifier extends StateNotifier<ClassesState> {
 
     final classes = await MongoDataService.getClasses(teacherId);
     if (!mounted) return;
+    // Read now: a later request that succeeds would clear lastError.
+    final classesError = MongoDataService.lastError;
 
     final allFromFirebase =
         await MongoDataService.getAllStudentsForTeacher(teacherId);
     if (!mounted) return;
+    final error = classesError ?? MongoDataService.lastError;
 
     // Count students per class code so ClassCard shows real numbers.
     final countByClass = <String, int>{};
@@ -246,6 +245,8 @@ class ClassesNotifier extends StateNotifier<ClassesState> {
       classes: updatedClasses,
       allStudents: allStudents,
       isLoading: false,
+      errorMessage: error,
+      clearError: error == null,
     );
 
     // Fetch engagement scores for each class in the background.
@@ -306,17 +307,6 @@ class ClassesNotifier extends StateNotifier<ClassesState> {
     if (score >= 65) return 'engaged';
     if (score >= 35) return 'distracted';
     return 'flagged';
-  }
-
-  List<StudentWithClass> _buildAllStudents({String? teacherId}) {
-    final id = teacherId ?? _ref.read(currentTeacherIdProvider) ?? '';
-    final edits = _ref.read(studentEditsProvider);
-    return MockDataService.getAllClassRostersForTeacher(id)
-        .expand((entry) => entry.value.map((baseStudent) => StudentWithClass(
-              student: edits[baseStudent.id] ?? baseStudent,
-              classCode: entry.key,
-            )))
-        .toList();
   }
 
   void setTab(ClassesTab tab) => state = state.copyWith(

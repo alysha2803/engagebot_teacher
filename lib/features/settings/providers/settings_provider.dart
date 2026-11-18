@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../data/mock/mock_data_service.dart';
 import '../../../data/services/mongo_data_service.dart';
 import '../../auth/providers/auth_provider.dart';
 
@@ -65,19 +64,15 @@ class SettingsNotifier extends StateNotifier<PreferencesState> {
     });
   }
 
-  static PreferencesState _buildInitial() {
-    final defaults = MockDataService.getDefaultPreferences();
-    final teacher = MockDataService.getTeacherProfile();
-    return PreferencesState(
-      realtimeAlerts: defaults['realtimeAlerts'] ?? true,
-      autoSchedule: defaults['autoSchedule'] ?? false,
-      cloudSync: defaults['cloudSync'] ?? true,
-      darkMode: false,
-      teacherName: teacher.name,
-      teacherSchool: teacher.school,
-      teacherSubject: teacher.subject,
-    );
-  }
+  // Default toggles; the teacher's details stay empty until the real profile loads.
+  static PreferencesState _buildInitial() => const PreferencesState(
+        realtimeAlerts: true,
+        autoSchedule: false,
+        cloudSync: true,
+        darkMode: false,
+        teacherName: '',
+        teacherSchool: '',
+      );
 
   Future<void> refreshFromApi(String teacherId) async {
     final profile = await MongoDataService.getTeacherProfile(teacherId);

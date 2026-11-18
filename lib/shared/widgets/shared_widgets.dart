@@ -237,3 +237,84 @@ class AppCard extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Connection problems — shown instead of sample data
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Full-screen message when nothing could be loaded from the server.
+class ConnectionErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const ConnectionErrorView({super.key, required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.liveRed),
+            const SizedBox(height: 16),
+            Text(
+              'Not connected',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: context.colorOnCard,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: context.colorMuted, height: 1.5),
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Try again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Slim banner when older data is on screen but the latest refresh failed.
+class ConnectionErrorBanner extends StatelessWidget {
+  final String message;
+
+  const ConnectionErrorBanner({super.key, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.liveRed.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.liveRed.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.cloud_off_rounded, size: 18, color: AppColors.liveRed),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(fontSize: 12.5, color: context.colorOnCard, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -10,6 +10,9 @@ class LiveSessionCard extends StatelessWidget {
   final String droidStatus;
   final String period;
   final bool hasClasses;
+  /// 'live' (droid session running), 'ended' (today's session finished) or
+  /// 'none' (no droid session today).
+  final String sessionState;
 
   const LiveSessionCard({
     super.key,
@@ -19,10 +22,18 @@ class LiveSessionCard extends StatelessWidget {
     required this.droidStatus,
     required this.period,
     this.hasClasses = true,
+    this.sessionState = 'live',
   });
 
   @override
   Widget build(BuildContext context) {
+    final isLive = sessionState == 'live';
+    final hasSession = sessionState != 'none';
+    final heading = isLive
+        ? 'LIVE SESSION'
+        : hasSession
+            ? 'LAST SESSION TODAY'
+            : 'NO SESSION RUNNING';
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -45,13 +56,15 @@ class LiveSessionCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Live indicator
-                const Row(
+                Row(
                   children: [
-                    PulsingDot(),
-                    SizedBox(width: 6),
+                    if (isLive) ...[
+                      const PulsingDot(),
+                      const SizedBox(width: 6),
+                    ],
                     Text(
-                      'LIVE SESSION',
-                      style: TextStyle(
+                      heading,
+                      style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
@@ -64,7 +77,7 @@ class LiveSessionCard extends StatelessWidget {
 
                 // Large percentage
                 Text(
-                  '$percentage%',
+                  hasSession ? '$percentage%' : '--',
                   style: const TextStyle(
                     fontSize: 48,
                     fontWeight: FontWeight.w700,
@@ -73,9 +86,11 @@ class LiveSessionCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Overall Engagement',
-                  style: TextStyle(
+                Text(
+                  hasSession
+                      ? 'Overall Engagement'
+                      : 'Starts when the droid begins a lesson',
+                  style: const TextStyle(
                     fontSize: 13,
                     color: Colors.white70,
                     fontWeight: FontWeight.w400,
@@ -88,14 +103,16 @@ class LiveSessionCard extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 6,
                   children: [
-                    _PillChip(
-                      icon: Icons.timer_outlined,
-                      label: '${sessionMinutes}m',
-                    ),
-                    _PillChip(
-                      icon: Icons.trending_up,
-                      label: trend,
-                    ),
+                    if (isLive)
+                      _PillChip(
+                        icon: Icons.timer_outlined,
+                        label: '${sessionMinutes}m',
+                      ),
+                    if (trend.isNotEmpty)
+                      _PillChip(
+                        icon: Icons.trending_up,
+                        label: trend,
+                      ),
                     _PillChip(
                       icon: Icons.schedule_rounded,
                       label: period,

@@ -38,7 +38,17 @@ class _ClassAnalyticsScreenState extends ConsumerState<ClassAnalyticsScreen>
   late final List<SessionRecord> _sessionHistory;
   // studentId → latestFocusScore from droid (null = no droid data yet)
   Map<String, int> _droidScores = {};
-  int? _droidOverallScore; // average across all students with droid data
+  // The class's real, backend-computed average (SessionReport.avgFocusScore,
+  // aggregated server-side) -- NOT recomputed client-side, so it always
+  // matches what's actually stored, including sessions where every
+  // recognized face is still unlabeled (see studentBreakdown below).
+  int? _droidOverallScore;
+  // Raw per-identity breakdown from the backend -- covers BOTH named
+  // students and not-yet-labeled ("Unlabeled-XXXX") faces. Split into
+  // identified/unidentified reactively in build() against the live roster,
+  // rather than here, since the roster can still be loading when this
+  // resolves.
+  List<Map<String, dynamic>> _studentBreakdown = [];
 
   @override
   void initState() {
@@ -79,13 +89,14 @@ class _ClassAnalyticsScreenState extends ConsumerState<ClassAnalyticsScreen>
             (s['latestFocusScore'] as num?)?.toInt() ??
             (s['avgFocusScore'] as num?)?.toInt() ?? 0,
     };
-    final vals = scores.values.toList();
-    final overall = vals.isEmpty
-        ? null
-        : (vals.reduce((a, b) => a + b) / vals.length).round();
     setState(() {
       _droidScores = scores;
-      _droidOverallScore = overall;
+      // latestAvgFocusScore is that ONE most-recent session's own stored
+      // MongoDB value -- what the card should show. summary['avgFocusScore']
+      // is an average ACROSS every session ever held for this class, which
+      // is a different (and, for "what's happening right now", wrong) number.
+      _droidOverallScore = (summary['latestAvgFocusScore'] as num?)?.toInt();
+      _studentBreakdown = breakdown.cast<Map<String, dynamic>>();
     });
   }
 
@@ -124,6 +135,16 @@ class _ClassAnalyticsScreenState extends ConsumerState<ClassAnalyticsScreen>
     // Reactively apply in-session edits (name/status/note changes from Manage).
     final edits = ref.watch(studentEditsProvider);
     final roster = _baseRoster.map((s) => edits[s.id] ?? s).toList();
+
+    // A droid-tracked identity with no matching real roster entry is a face
+    // the droid has seen and scored but nobody's labeled yet ("Unlabeled-XXXX").
+    // Computed here (not in _loadDroidScores) so it's always correct against
+    // whichever roster is currently loaded, regardless of which async call
+    // (roster vs droid scores) happens to resolve first.
+    final rosterIds = roster.map((s) => s.id).toSet();
+    final unidentified = _studentBreakdown
+        .where((s) => !rosterIds.contains(s['studentId'] as String? ?? ''))
+        .toList();
     final behaviourData = _baseBehaviourData.map((r) {
       final edit = edits[r.studentId];
       if (edit == null) return r;
@@ -196,6 +217,7 @@ class _ClassAnalyticsScreenState extends ConsumerState<ClassAnalyticsScreen>
             engagement: _engagement,
             droidScores: _droidScores,
             droidOverallScore: _droidOverallScore,
+            unidentified: unidentified,
             aiRec: MockDataService.getAIRecommendation(),
           ),
           _BehaviourTab(behaviourData: behaviourData, droidScores: _droidScores),
@@ -229,6 +251,7 @@ class _OverviewTab extends StatelessWidget {
   final Map<String, dynamic> engagement;
   final Map<String, int> droidScores;
   final int? droidOverallScore;
+  final List<Map<String, dynamic>> unidentified;
   final Map<String, dynamic> aiRec;
 
   const _OverviewTab({
@@ -236,6 +259,7 @@ class _OverviewTab extends StatelessWidget {
     required this.roster,
     required this.engagement,
     required this.droidScores,
+    required this.unidentified,
     required this.aiRec,
     this.droidOverallScore,
   });
@@ -312,6 +336,30 @@ class _OverviewTab extends StatelessWidget {
               },
             ),
           ),
+
+          if (unidentified.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            SectionHeader(
+              title: 'Unidentified Students',
+              trailing: Text(
+                '${unidentified.length}',
+                style: TextStyle(fontSize: 13, color: context.colorMuted),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'The droid has tracked these faces but nobody\'s labeled them '
+              'yet -- open Identify Students to assign a name.',
+              style: TextStyle(fontSize: 12, color: context.colorSubtle),
+            ),
+            const SizedBox(height: 12),
+            for (final s in unidentified)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _UnidentifiedStudentTile(data: s),
+              ),
+          ],
+
           const SizedBox(height: 32),
         ],
       ),
@@ -749,6 +797,96 @@ class _StudentTile extends StatelessWidget {
             ),
             overflow: TextOverflow.ellipsis,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// A droid-tracked face with no matching real roster entry -- taps open to
+// show its per-individual focus/distraction/participation numbers, taken
+// straight from the backend's class-summary breakdown (itself sourced from
+// the student's latest SessionReport entry in MongoDB).
+class _UnidentifiedStudentTile extends StatelessWidget {
+  final Map<String, dynamic> data;
+
+  const _UnidentifiedStudentTile({required this.data});
+
+  Color _levelColor(String level) => switch (level) {
+        'high' => AppColors.successGreen,
+        'medium' => AppColors.warningAmber,
+        _ => AppColors.liveRed,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final name = data['studentName'] as String? ?? 'Unidentified';
+    final focus = (data['latestFocusScore'] as num?)?.toInt() ?? 0;
+    final participation = (data['latestParticipationScore'] as num?)?.toInt() ?? 0;
+    final distracted = (data['distractedCount'] as num?)?.toInt() ?? 0;
+    final level = data['latestEngagementLevel'] as String? ?? 'medium';
+    final sessions = (data['sessions'] as num?)?.toInt() ?? 1;
+    final col = _levelColor(level);
+
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          leading: CircleAvatar(
+            radius: 20,
+            backgroundColor: context.colorAvatarBg,
+            child: Icon(Icons.person_outline, color: context.colorMuted, size: 20),
+          ),
+          title: Text(
+            name,
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: context.colorOnCard),
+          ),
+          subtitle: Text(
+            'Not yet labeled · $sessions session${sessions == 1 ? '' : 's'}',
+            style: TextStyle(fontSize: 12, color: context.colorSubtle),
+          ),
+          trailing: SageChip(label: level, fontSize: 10),
+          children: [
+            Row(
+              children: [
+                Expanded(child: _MiniStat(label: 'Focus', value: '$focus%', color: col)),
+                const SizedBox(width: 10),
+                Expanded(child: _MiniStat(label: 'Participation', value: '$participation%', color: AppColors.primaryGreen)),
+                const SizedBox(width: 10),
+                Expanded(child: _MiniStat(label: 'Distractions', value: '$distracted', color: AppColors.liveRed)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _MiniStat({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        children: [
+          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(fontSize: 10, color: context.colorMuted)),
         ],
       ),
     );
